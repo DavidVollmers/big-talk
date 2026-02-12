@@ -1,7 +1,6 @@
 [project]
-name = "big-talk"
+name = "big-talk-ai"
 version = "0.0.0"
-description = "Biggest talk in the town"
-classifiers = ["Private :: Do Not Upload"]
+description = "Biggest talk in town"
 requires-python = ">=3.12"
 dependencies = []
