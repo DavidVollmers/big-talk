@@ -9,10 +9,11 @@
   "devDependencies": {
     "@commitlint/cli": "^20.4.1",
     "@commitlint/config-conventional": "^20.4.1",
+    "@dev-tales/nx-python": "^0.3.0",
     "husky": "^9.1.7",
     "lint-staged": "^16.2.7",
-    "prettier": "^3.8.1",
-    "nx": "22.5.0"
+    "nx": "22.5.0",
+    "prettier": "^3.8.1"
   },
   "lint-staged": {
     "*.*": "prettier --write"
