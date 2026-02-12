@@ -1,0 +1,11 @@
+.gitignore
+.prettierignore
+*.iml
+*.xml
+*.toml
+*.lock
+.gitkeep
+*.py
+*.txt
+.nvmrc
+.flake8
