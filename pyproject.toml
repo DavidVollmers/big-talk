@@ -1,6 +1,19 @@
 [project]
 name = "big-talk-workspace"
 version = "0.0.0"
-classifiers = ["Private :: Do Not Upload"]
-requires-python = ">=3.13"
-dependencies = []
+classifiers = [ "Private :: Do Not Upload" ]
+requires-python = ">=3.12"
+dependencies = [ "big-talk" ]
+
+[tool.uv.workspace]
+members = [ "libs/big-talk" ]
+
+[tool.uv.sources.big-talk]
+workspace = true
+
+[dependency-groups]
+dev = [
+    "flake8>=7.3.0",
+    "pytest>=9.0.2",
+]
+
