@@ -4,16 +4,25 @@ from typing import Iterable, Any
 
 from .llm import LLMProvider, LLMProviderFactory
 from .message import Message
-from .streaming import StreamContext, StreamMiddleware, StreamHandler
+from .streaming import StreamContext, StreamMiddleware, StreamHandler, CallableStreamMiddleware, StreamMiddlewareBase
 
 
-class MiddlewareWrapper(StreamHandler):
+class _CallableMiddlewareWrapper(CallableStreamMiddleware):
+    def __init__(self, call: CallableStreamMiddleware):
+        self._call = call
+
+    async def __call__(self, handler: StreamHandler, ctx: StreamContext, **kwargs: Any) -> AsyncGenerator[
+        Message, None]:
+        async for message in self._call(handler, ctx, **kwargs):
+            yield message
+
+
+class _MiddlewareWrapper(StreamHandler):
     def __init__(self, mw: StreamMiddleware, next_handler: StreamHandler):
         self._mw = mw
         self._next_handler = next_handler
 
-    async def __call__(self, ctx: StreamContext, **kwargs: Any) -> AsyncGenerator[
-        Message, None]:
+    async def __call__(self, ctx: StreamContext, **kwargs: Any) -> AsyncGenerator[Message, None]:
         async for message in self._mw(self._next_handler, ctx, **kwargs):
             yield message
 
@@ -27,6 +36,8 @@ class BigTalk:
         self._middleware: list[StreamMiddleware] = []
 
     def add_middleware(self, middleware: StreamMiddleware):
+        if not isinstance(middleware, StreamMiddlewareBase):
+            middleware = _CallableMiddlewareWrapper(middleware)
         self._middleware.append(middleware)
 
     def add_provider(self, name: str, provider_factory: LLMProviderFactory):
@@ -79,7 +90,7 @@ class BigTalk:
         handler = self._llm_stream
 
         for middleware in reversed(self._middleware):
-            handler = MiddlewareWrapper(middleware, handler)
+            handler = _MiddlewareWrapper(middleware, handler)
 
         return handler
 
