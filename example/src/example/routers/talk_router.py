@@ -5,11 +5,11 @@ from fastapi.responses import StreamingResponse
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix='/chat', tags=['chat'])
+router = APIRouter(prefix='/talk', tags=['talk'])
 
 
 @router.get('/')
-async def stream_chat(request: Request):
+async def stream_talk(request: Request):
     last_event_id = request.headers.get('Last-Event-ID')
 
     async def event_generator():

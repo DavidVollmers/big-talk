@@ -2,8 +2,8 @@ import pytest
 
 
 @pytest.mark.asyncio
-async def test_chat(client):
-    response = await client.get('/chat/')
+async def test_talk(client):
+    response = await client.get('/talk/')
 
     assert response.status_code == 200
     assert response.headers['content-type'] == 'text/event-stream; charset=utf-8'
