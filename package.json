@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "prepare": "husky"
+    "prepare": "husky",
+    "sync": "uv sync --all-packages --all-groups --all-extras"
   },
   "devDependencies": {
     "@commitlint/cli": "^20.4.1",

@@ -4,3 +4,6 @@ version = "0.0.0"
 description = "Biggest talk in town"
 requires-python = ">=3.12"
 dependencies = []
+
+[project.optional-dependencies]
+anthropic = ["anthropic>=0.79.0"]
