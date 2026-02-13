@@ -7,6 +7,17 @@ from .message import Message
 from .stream_middleware import StreamMiddleware, StreamHandler
 
 
+class MiddlewareWrapper(StreamHandler):
+    def __init__(self, mw: StreamMiddleware, next_handler: StreamHandler):
+        self._mw = mw
+        self._next_handler = next_handler
+
+    async def __call__(self, model: str, messages: Iterable[Message], **kwargs: Any) -> AsyncGenerator[
+        Message, None]:
+        async for message in self._mw(self._next_handler, model, messages, **kwargs):
+            yield message
+
+
 class BigTalk:
     def __init__(self):
         self._providers: dict[str, LLMProvider] = {}
@@ -65,16 +76,6 @@ class BigTalk:
         handler = self._llm_stream
 
         for middleware in reversed(self._middleware):
-            class MiddlewareWrapper(StreamHandler):
-                def __init__(self, mw: StreamMiddleware, next_handler: StreamHandler):
-                    self._mw = mw
-                    self._next_handler = next_handler
-
-                async def __call__(self, model: str, messages: Iterable[Message], **kwargs: Any) -> AsyncGenerator[
-                    Message, None]:
-                    async for message in self._mw(self._next_handler, model, messages, **kwargs):
-                        yield message
-
             handler = MiddlewareWrapper(middleware, handler)
 
         return handler
