@@ -69,8 +69,7 @@ class BigTalk:
     async def stream(self, model: str, messages: Iterable[Message], **kwargs: Any) -> AsyncGenerator[Message, None]:
         ctx = StreamContext(model=model, messages=messages, _provider_resolver=self._get_llm_provider)
         handler = self._build_middleware_stack()
-        response = handler(ctx, **kwargs)
-        async for message in response:
+        async for message in handler(ctx, **kwargs):
             yield message
 
     async def close(self):

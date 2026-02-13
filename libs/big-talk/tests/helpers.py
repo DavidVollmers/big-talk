@@ -10,21 +10,26 @@ class TestLLMProvider(LLMProvider):
         self.name = name
         self.responses = responses or ["hello", "world"]
         self.fail_on_stream = fail_on_stream
-        self.stream_calls = []  # To verify calls
+        self.stream_calls: list[dict] = []
         self.close_called = False
 
     async def count_tokens(self, model: str, messages: Iterable[Message], **kwargs) -> int:
         return len(self.responses)
 
     async def stream(self, model: str, messages: Iterable[Message], **kwargs) -> AsyncGenerator[Message, None]:
-        self.stream_calls.append({"model": model, "messages": messages, "kwargs": kwargs})
+        # Store calls for verification
+        self.stream_calls.append({
+            "model": model,
+            "messages": list(messages),
+            "kwargs": kwargs
+        })
 
         if self.fail_on_stream:
             raise RuntimeError(f"Simulated failure in {self.name}")
 
         for content in self.responses:
             yield Message(role="assistant", content=content)
-            await asyncio.sleep(0.01)  # Simulate network lag
+            await asyncio.sleep(0.001)
 
     async def close(self):
         self.close_called = True
