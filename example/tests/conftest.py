@@ -1,6 +1,9 @@
 import pytest_asyncio
 from asgi_lifespan import LifespanManager
+from dinkleberg import DependencyConfigurator
 from httpx import AsyncClient, ASGITransport
+
+from example.main import api
 
 
 @pytest_asyncio.fixture

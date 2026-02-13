@@ -4,7 +4,10 @@ version = "0.0.0"
 description = "My awesome Python library"
 classifiers = ["Private :: Do Not Upload"]
 requires-python = ">=3.13"
-dependencies = []
+dependencies = [
+    "dinkleberg[fastapi]>=1.1.4",
+    "fastapi[standard]>=0.129.0",
+]
 
 [dependency-groups]
 dev = [
