@@ -1,4 +1,4 @@
-from .anthropic import Anthropic
-from .llm import LLM
+from .anthropic_provider import AnthropicProvider
+from .llm_provider import LLMProvider
 
-__all__ = ['Anthropic', 'LLM']
+__all__ = ['AnthropicProvider', 'LLMProvider']

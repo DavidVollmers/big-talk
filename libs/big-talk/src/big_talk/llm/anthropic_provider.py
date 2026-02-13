@@ -3,14 +3,14 @@ from typing import TYPE_CHECKING, Iterable, AsyncGenerator
 from anthropic import Omit, omit
 from anthropic.types import MessageParam
 
-from .llm import LLM
+from .llm_provider import LLMProvider
 from ..message import Message
 
 if TYPE_CHECKING:
     import anthropic
 
 
-class Anthropic(LLM):
+class AnthropicProvider(LLMProvider):
     def __init__(self):
         try:
             from anthropic import AsyncAnthropic
@@ -20,6 +20,9 @@ class Anthropic(LLM):
                 'The "anthropic" package is required to use the AnthropicProvider. '
                 'Please install it with "pip install big-talk-ai[anthropic]".'
             )
+
+    async def close(self):
+        await self._client.close()
 
     @staticmethod
     def _transform_messages(messages: Iterable[Message]) -> tuple[str | Omit, list[MessageParam]]:
