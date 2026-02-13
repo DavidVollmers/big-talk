@@ -1,8 +1,8 @@
 from dataclasses import dataclass
 from typing import Callable, Iterable
 
-from .llm import LLMProvider
-from .message import Message
+from ..llm import LLMProvider
+from ..message import Message
 
 
 @dataclass

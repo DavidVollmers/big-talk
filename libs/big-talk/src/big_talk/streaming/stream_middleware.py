@@ -1,6 +1,6 @@
 from typing import AsyncGenerator, Protocol, runtime_checkable, Any
 
-from .message import Message
+from ..message import Message
 from .stream_context import StreamContext
 from .stream_handler import StreamHandler
 
