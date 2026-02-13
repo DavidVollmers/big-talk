@@ -10,7 +10,7 @@ class LLMProvider(ABC):
         pass
 
     @abstractmethod
-    async def stream(self, model: str, messages: Iterable[Message], **kwargs) -> AsyncGenerator[Message, None]:
+    def stream(self, model: str, messages: Iterable[Message], **kwargs) -> AsyncGenerator[Message, None]:
         pass
 
     async def close(self):
