@@ -1,16 +1,16 @@
-from typing import TYPE_CHECKING, Sequence, AsyncGenerator
+from typing import TYPE_CHECKING, Iterable, AsyncGenerator
 
 from anthropic import Omit, omit
 from anthropic.types import MessageParam
 
-from .llm_provider import LLMProvider
-from .message import Message
+from .llm import LLM
+from ..message import Message
 
 if TYPE_CHECKING:
     import anthropic
 
 
-class AnthropicProvider(LLMProvider):
+class Anthropic(LLM):
     def __init__(self):
         try:
             from anthropic import AsyncAnthropic
@@ -22,7 +22,7 @@ class AnthropicProvider(LLMProvider):
             )
 
     @staticmethod
-    def _transform_messages(messages: Sequence[Message]) -> tuple[str | Omit, list[MessageParam]]:
+    def _transform_messages(messages: Iterable[Message]) -> tuple[str | Omit, list[MessageParam]]:
         system_prompts = []
         transformed_messages = []
         for message in messages:
@@ -38,13 +38,13 @@ class AnthropicProvider(LLMProvider):
         system_prompt = '\n'.join(system_prompts) if system_prompts else omit
         return system_prompt, transformed_messages
 
-    async def count_tokens(self, model: str, messages: Sequence[Message], **kwargs) -> int:
+    async def count_tokens(self, model: str, messages: Iterable[Message], **kwargs) -> int:
         system, transformed_messages = self._transform_messages(messages)
         result = await self._client.messages.count_tokens(model=model, system=system, messages=transformed_messages,
                                                           **kwargs)
         return result.input_tokens
 
-    async def stream(self, model: str, messages: Sequence[Message], **kwargs) -> AsyncGenerator[Message, None]:
+    async def stream(self, model: str, messages: Iterable[Message], **kwargs) -> AsyncGenerator[Message, None]:
         system, transformed_messages = self._transform_messages(messages)
         async with self._client.messages.stream(model=model, system=system, messages=transformed_messages,
                                                 **kwargs) as stream:
