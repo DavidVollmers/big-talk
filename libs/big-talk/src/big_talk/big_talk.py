@@ -4,7 +4,9 @@ from typing import Iterable, Any
 
 from .llm import LLMProvider, LLMProviderFactory
 from .message import Message
-from .stream_middleware import StreamMiddleware, StreamHandler
+from .stream_context import StreamContext
+from .stream_middleware import StreamMiddleware
+from .stream_handler import StreamHandler
 
 
 class MiddlewareWrapper(StreamHandler):
@@ -12,9 +14,9 @@ class MiddlewareWrapper(StreamHandler):
         self._mw = mw
         self._next_handler = next_handler
 
-    async def __call__(self, model: str, messages: Iterable[Message], **kwargs: Any) -> AsyncGenerator[
+    async def __call__(self, ctx: StreamContext, **kwargs: Any) -> AsyncGenerator[
         Message, None]:
-        async for message in self._mw(self._next_handler, model, messages, **kwargs):
+        async for message in self._mw(self._next_handler, ctx, **kwargs):
             yield message
 
 
@@ -41,7 +43,7 @@ class BigTalk:
         provider, model_name = model.split('/', 1)
         return provider, model_name
 
-    def _resolve_provider(self, provider: str) -> LLMProvider:
+    def _get_provider(self, provider: str) -> LLMProvider:
         if provider in self._providers:
             return self._providers[provider]
         elif provider in self._provider_factories:
@@ -51,9 +53,14 @@ class BigTalk:
         else:
             raise NotImplementedError(f'Provider "{provider}" is not supported.')
 
+    def _get_llm_provider(self, model: str) -> tuple[LLMProvider, str]:
+        provider, model_name = self._parse_model(model)
+        return self._get_provider(provider), model_name
+
     async def stream(self, model: str, messages: Iterable[Message], **kwargs: Any) -> AsyncGenerator[Message, None]:
+        ctx = StreamContext(model=model, messages=messages, _provider_resolver=self._get_llm_provider)
         handler = self._build_middleware_stack()
-        response = handler(model, messages, **kwargs)
+        response = handler(ctx, **kwargs)
         async for message in response:
             yield message
 
@@ -64,12 +71,10 @@ class BigTalk:
         if exceptions:
             raise ExceptionGroup('One or more providers failed to close', exceptions)
 
-    async def _llm_stream(self, model: str, messages: Iterable[Message], **kwargs: Any) -> AsyncGenerator[
-        Message, None]:
-        provider, model_name = self._parse_model(model)
-        llm = self._resolve_provider(provider)
-
-        async for message in llm.stream(model=model_name, messages=messages, **kwargs):
+    @staticmethod
+    async def _llm_stream(ctx: StreamContext, **kwargs: Any) -> AsyncGenerator[Message, None]:
+        provider, model_name = ctx.get_llm_provider()
+        async for message in provider.stream(model=model_name, messages=ctx.messages, **kwargs):
             yield message
 
     def _build_middleware_stack(self) -> StreamHandler:
