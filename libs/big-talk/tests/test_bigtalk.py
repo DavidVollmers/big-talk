@@ -36,7 +36,8 @@ async def test_lazy_loading(bigtalk, create_provider):
     assert not factory_called
 
     # Trigger load
-    async for _ in bigtalk.stream("lazy/model", []): pass
+    async for _ in bigtalk.stream("lazy/model", []):
+        pass
 
     assert factory_called
 
@@ -53,8 +54,10 @@ async def test_singleton_reuse(bigtalk, create_provider):
 
     bigtalk.add_provider("reuse", factory)
 
-    async for _ in bigtalk.stream("reuse/m1", []): pass
-    async for _ in bigtalk.stream("reuse/m2", []): pass
+    async for _ in bigtalk.stream("reuse/m1", []):
+        pass
+    async for _ in bigtalk.stream("reuse/m2", []):
+        pass
 
     assert call_count == 1  # Factory only called once
 
@@ -62,10 +65,12 @@ async def test_singleton_reuse(bigtalk, create_provider):
 @pytest.mark.asyncio
 async def test_invalid_inputs(bigtalk):
     with pytest.raises(ValueError, match="Expected format"):
-        async for _ in bigtalk.stream("bad-format", []): pass
+        async for _ in bigtalk.stream("bad-format", []):
+            pass
 
     with pytest.raises(NotImplementedError, match="not supported"):
-        async for _ in bigtalk.stream("unknown/model", []): pass
+        async for _ in bigtalk.stream("unknown/model", []):
+            pass
 
 
 @pytest.mark.asyncio
@@ -75,7 +80,8 @@ async def test_provider_stream_failure(bigtalk, create_provider):
     bigtalk.add_provider("fail", lambda: provider)
 
     with pytest.raises(RuntimeError, match="Simulated failure"):
-        async for _ in bigtalk.stream("fail/m", []): pass
+        async for _ in bigtalk.stream("fail/m", []):
+            pass
 
 
 @pytest.mark.asyncio
@@ -87,8 +93,10 @@ async def test_global_close(bigtalk, create_provider):
     bigtalk.add_provider("p2", lambda: p2)
 
     # Must initialize them first
-    async for _ in bigtalk.stream("p1/m", []): pass
-    async for _ in bigtalk.stream("p2/m", []): pass
+    async for _ in bigtalk.stream("p1/m", []):
+        pass
+    async for _ in bigtalk.stream("p2/m", []):
+        pass
 
     await bigtalk.close()
 

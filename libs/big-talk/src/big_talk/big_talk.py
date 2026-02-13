@@ -11,8 +11,8 @@ class _CallableMiddlewareWrapper(CallableStreamMiddleware):
     def __init__(self, call: CallableStreamMiddleware):
         self._call = call
 
-    async def __call__(self, handler: StreamHandler, ctx: StreamContext, **kwargs: Any) -> AsyncGenerator[
-        Message, None]:
+    async def __call__(self, handler: StreamHandler, ctx: StreamContext, **kwargs: Any) \
+            -> AsyncGenerator[Message, None]:
         async for message in self._call(handler, ctx, **kwargs):
             yield message
 

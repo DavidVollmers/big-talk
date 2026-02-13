@@ -24,7 +24,8 @@ async def test_middleware_execution_order(bigtalk, create_provider, simple_messa
     bigtalk.add_middleware(mw1)
     bigtalk.add_middleware(mw2)
 
-    async for _ in bigtalk.stream("test/model", [simple_message]): pass
+    async for _ in bigtalk.stream("test/model", [simple_message]):
+        pass
 
     assert call_log == ["mw1_enter", "mw2_enter", "mw2_exit", "mw1_exit"]
 
@@ -47,7 +48,8 @@ async def test_middleware_context_mutation(bigtalk, create_provider, simple_mess
     bigtalk.add_middleware(router_middleware)
 
     # Call with A
-    async for _ in bigtalk.stream("provA/expensive", [simple_message]): pass
+    async for _ in bigtalk.stream("provA/expensive", [simple_message]):
+        pass
 
     # Assert A was IGNORED and B was USED
     assert len(prov_a.stream_calls) == 0
@@ -86,7 +88,8 @@ async def test_middleware_argument_injection(bigtalk, create_provider):
 
     bigtalk.add_middleware(inject_middleware)
 
-    async for _ in bigtalk.stream("test/m", []): pass
+    async for _ in bigtalk.stream("test/m", []):
+        pass
 
     assert provider.stream_calls[0]["kwargs"]["temperature"] == 0.99
 
@@ -107,6 +110,7 @@ async def test_middleware_can_resolve_provider_manually(bigtalk, create_provider
             yield msg
 
     bigtalk.add_middleware(inspection_middleware)
-    async for _ in bigtalk.stream("test/m", []): pass
+    async for _ in bigtalk.stream("test/m", []):
+        pass
 
     assert resolved_provider is provider

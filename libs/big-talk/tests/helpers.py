@@ -1,5 +1,5 @@
 import asyncio
-from typing import AsyncGenerator, Iterable, Any
+from typing import AsyncGenerator, Iterable
 from big_talk.llm import LLMProvider
 from big_talk import Message
 from big_talk.streaming import StreamContext, StreamHandler

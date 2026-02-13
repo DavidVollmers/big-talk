@@ -1,13 +1,10 @@
-from typing import TYPE_CHECKING, Iterable, AsyncGenerator
+from typing import Iterable, AsyncGenerator
 
 from anthropic import Omit, omit
 from anthropic.types import MessageParam
 
 from .llm_provider import LLMProvider
 from ..message import Message
-
-if TYPE_CHECKING:
-    import anthropic
 
 
 class AnthropicProvider(LLMProvider):
