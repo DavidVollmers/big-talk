@@ -74,6 +74,9 @@ wheels = [
 name = "big-talk-ai"
 version = "0.0.0"
 source = { editable = "libs/big-talk" }
+dependencies = [
+    { name = "docstring-parser" },
+]
 
 [package.optional-dependencies]
 anthropic = [
@@ -87,6 +90,7 @@ openai = [
 [package.metadata]
 requires-dist = [
     { name = "anthropic", marker = "extra == 'anthropic'", specifier = ">=0.79.0" },
+    { name = "docstring-parser", specifier = ">=0.17.0" },
     { name = "openai", marker = "extra == 'openai'", specifier = ">=2.21.0" },
     { name = "tiktoken", marker = "extra == 'openai'", specifier = ">=0.12.0" },
 ]

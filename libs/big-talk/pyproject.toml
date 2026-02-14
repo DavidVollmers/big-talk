@@ -3,7 +3,9 @@ name = "big-talk-ai"
 version = "0.0.0"
 description = "Biggest talk in town"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "docstring-parser>=0.17.0",
+]
 
 [project.optional-dependencies]
 anthropic = ["anthropic>=0.79.0"]

@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import Callable, Sequence
 
+from ..tool import Tool
 from ..llm import LLMProvider
 from ..message import Message
 
@@ -8,6 +9,7 @@ from ..message import Message
 @dataclass
 class StreamContext:
     model: str
+    tools: Sequence[Tool]
     messages: Sequence[Message]
     _provider_resolver: Callable[[str], tuple[LLMProvider, str]]
 

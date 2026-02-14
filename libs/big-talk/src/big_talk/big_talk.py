@@ -1,7 +1,7 @@
 import asyncio
-from collections.abc import AsyncGenerator
-from typing import Sequence, Any
+from typing import Sequence, Any, AsyncGenerator, Callable
 
+from .tool import Tool
 from .llm import LLMProvider, LLMProviderFactory
 from .message import Message
 from .streaming import StreamContext, StreamMiddleware, StreamHandler, CallableStreamMiddleware, StreamMiddlewareBase
@@ -67,13 +67,26 @@ class BigTalk:
         provider, model_name = self._parse_model(model)
         return self._get_provider(provider), model_name
 
-    async def stream(self, model: str, messages: Sequence[Message], **kwargs: Any) -> AsyncGenerator[Message, None]:
+    async def stream(self, model: str, messages: Sequence[Message], tools: Sequence[Callable | Tool] = None,
+                     **kwargs: Any) -> AsyncGenerator[Message, None]:
         if not any(message['role'] == 'user' for message in messages):
             raise ValueError('At least one user message is required to generate a response.')
 
-        ctx = StreamContext(model=model, messages=messages, _provider_resolver=self._get_llm_provider)
+        normalized_tools = []
+        if tools:
+            for t in tools:
+                if isinstance(t, Tool):
+                    normalized_tools.append(t)
+                elif callable(t):
+                    normalized_tools.append(Tool.from_func(t))
+                else:
+                    raise TypeError(f'Invalid tool type: {type(t)}')
+
+        ctx = StreamContext(model=model, tools=normalized_tools, messages=messages,
+                            _provider_resolver=self._get_llm_provider)
         handler = self._build_middleware_stack()
         async for message in handler(ctx, **kwargs):
+            # TODO handle tool calls and results
             yield message
 
     async def close(self):
