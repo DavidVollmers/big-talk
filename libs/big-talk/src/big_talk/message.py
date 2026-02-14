@@ -42,6 +42,7 @@ AssistantContentBlock: TypeAlias = Union[Text, Thinking, ToolUse]
 
 class AssistantMessage(TypedDict):
     id: str
+    parent_id: str
     role: Literal['assistant']
     content: Sequence[AssistantContentBlock]
     is_aggregate: bool

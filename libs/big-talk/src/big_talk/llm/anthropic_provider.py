@@ -1,10 +1,11 @@
 from typing import Sequence, AsyncGenerator, Union
+from uuid import uuid4
 
 from anthropic import Omit, omit
 from anthropic.types import MessageParam, ToolResultBlockParam, ThinkingBlockParam, TextBlockParam, ToolUseBlockParam
 
 from .llm_provider import LLMProvider
-from ..message import Message, AssistantContentBlock, ToolResult, ToolUse, Text
+from ..message import Message, AssistantContentBlock, ToolResult, ToolUse, Text, AssistantMessage
 
 
 class AnthropicProvider(LLMProvider):
@@ -22,14 +23,21 @@ class AnthropicProvider(LLMProvider):
         await self._client.close()
 
     async def count_tokens(self, model: str, messages: Sequence[Message], **kwargs) -> int:
-        system, converted = self._convert_messages(messages)
+        system, converted, _ = self._convert_messages(messages)
         result = await self._client.messages.count_tokens(model=model, system=system, messages=converted, **kwargs)
         return result.input_tokens
 
     async def stream(self, model: str, messages: Sequence[Message], **kwargs) -> AsyncGenerator[Message, None]:
-        system, converted = self._convert_messages(messages)
+        system, converted, last_user_message_id = self._convert_messages(messages)
         async with self._client.messages.stream(model=model, system=system, messages=converted, **kwargs) as stream:
+            message_id = str(uuid4())
+            blocks: list[AssistantContentBlock] = []
             async for chunk in stream:
+                if chunk.type == 'message_stop':
+                    yield AssistantMessage(id=message_id, role='assistant', content=blocks,
+                                           parent_id=last_user_message_id, is_aggregate=True)
+                    blocks = []
+
                 if chunk.type != 'content_block_stop':
                     continue
 
@@ -43,14 +51,18 @@ class AnthropicProvider(LLMProvider):
                     block = ToolUse(type='tool_use', id=chunk.content_block.id, name=chunk.content_block.name,
                                     params=chunk.content_block.input)
                 else:
+                    # TODO redacted thinking
                     continue
 
-                yield Message(role='assistant', content=[block])
+                blocks.append(block)
+                yield AssistantMessage(id=message_id, role='assistant', content=[block], parent_id=last_user_message_id,
+                                       is_aggregate=False)
 
     @staticmethod
-    def _convert_messages(messages: Sequence[Message]) -> tuple[str | Omit, list[MessageParam]]:
+    def _convert_messages(messages: Sequence[Message]) -> tuple[str | Omit, list[MessageParam], str]:
         system_parts = []
         converted = []
+        last_user_message_id = None
         for message in messages:
             role = message['role']
             content = message['content']
@@ -58,6 +70,7 @@ class AnthropicProvider(LLMProvider):
                 if isinstance(content, str):
                     system_parts.append(content)
                 else:
+                    last_user_message_id = message['id']
                     converted.append(MessageParam(
                         role='user',
                         content=[AnthropicProvider._convert_tool_result(block) for block in content]
@@ -74,7 +87,7 @@ class AnthropicProvider(LLMProvider):
                 ))
 
         system = '\n'.join(system_parts) if system_parts else omit
-        return system, converted
+        return system, converted, last_user_message_id
 
     @staticmethod
     def _convert_tool_result(block: ToolResult) -> ToolResultBlockParam:

@@ -67,6 +67,9 @@ class BigTalk:
         return self._get_provider(provider), model_name
 
     async def stream(self, model: str, messages: Sequence[Message], **kwargs: Any) -> AsyncGenerator[Message, None]:
+        if not any(message['role'] == 'user' for message in messages):
+            raise ValueError('At least one user message is required to generate a response.')
+
         ctx = StreamContext(model=model, messages=messages, _provider_resolver=self._get_llm_provider)
         handler = self._build_middleware_stack()
         async for message in handler(ctx, **kwargs):
