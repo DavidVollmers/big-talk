@@ -61,7 +61,7 @@ class OpenAIProvider(LLMProvider):
 
             if delta.tool_calls:
                 if text_buffer:
-                    full_text = "".join(text_buffer)
+                    full_text = ''.join(text_buffer)
                     block = Text(type='text', text=full_text)
                     blocks.append(block)
 
@@ -89,8 +89,8 @@ class OpenAIProvider(LLMProvider):
                             is_aggregate=False
                         )
 
-                        current_tool_id = ""
-                        current_tool_name = ""
+                        current_tool_id = ''
+                        current_tool_name = ''
                         current_tool_args = []
 
                     current_tool_index = idx
@@ -102,7 +102,7 @@ class OpenAIProvider(LLMProvider):
                         current_tool_args.append(tool_chunk.function.arguments)
 
         if text_buffer:
-            full_text = "".join(text_buffer)
+            full_text = ''.join(text_buffer)
             block = Text(type='text', text=full_text)
             blocks.append(block)
             yield AssistantMessage(
