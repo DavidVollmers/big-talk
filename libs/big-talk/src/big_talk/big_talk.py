@@ -100,3 +100,8 @@ class BigTalk:
     def _anthropic_provider_factory() -> LLMProvider:
         from .llm.anthropic_provider import AnthropicProvider
         return AnthropicProvider()
+
+    @staticmethod
+    def _openai_provider_factory() -> LLMProvider:
+        from .llm.openai_provider import OpenAIProvider
+        return OpenAIProvider()

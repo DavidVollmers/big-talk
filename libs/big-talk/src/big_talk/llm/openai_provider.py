@@ -1,5 +1,5 @@
 import json
-from typing import Sequence, AsyncGenerator
+from typing import Sequence, AsyncGenerator, TYPE_CHECKING
 from uuid import uuid4
 
 from openai.types.chat import ChatCompletionMessageParam, ChatCompletionSystemMessageParam, \
@@ -10,6 +10,9 @@ from openai.types.chat.chat_completion_message_function_tool_call_param import F
 from .. import ToolUse
 from ..message import Message, AssistantContentBlock, Text, AssistantMessage
 from .llm_provider import LLMProvider
+
+if TYPE_CHECKING:
+    from tiktoken import Encoding
 
 
 class OpenAIProvider(LLMProvider):
@@ -27,12 +30,6 @@ class OpenAIProvider(LLMProvider):
 
     async def close(self):
         await self._client.close()
-
-    async def count_tokens(self, model: str, messages: Sequence[Message], **kwargs) -> int:
-        # encoding = self._encoding_for_model(model)
-        # TODO https://developers.openai.com/cookbook/examples/how_to_count_tokens_with_tiktoken/
-        raise NotImplementedError(
-            'Token counting is not implemented for OpenAIProvider yet. Please use the tiktoken library directly.')
 
     async def stream(self, model: str, messages: Sequence[Message], **kwargs) -> AsyncGenerator[Message, None]:
         converted, last_user_message_id = self._convert_messages(messages)
@@ -124,7 +121,6 @@ class OpenAIProvider(LLMProvider):
                 is_aggregate=False
             )
 
-        # 3. Yield Aggregate
         yield AssistantMessage(
             id=message_id,
             role='assistant',
@@ -198,3 +194,47 @@ class OpenAIProvider(LLMProvider):
                 ))
 
         return converted, last_user_message_id
+
+    async def count_tokens(self, model: str, messages: Sequence[Message], **kwargs) -> int:
+        encoding = self._encoding_for_model(model)
+        converted_messages, _ = self._convert_messages(messages)
+        # TODO tools once supported
+        # https://github.com/openai/openai-cookbook/blob/main/examples/How_to_count_tokens_with_tiktoken.ipynb
+        return self._count_message_tokens(converted_messages, model, encoding)
+
+    @staticmethod
+    def _count_message_tokens(messages: list[ChatCompletionMessageParam], model: str, encoding: 'Encoding') -> int:
+        # Constants for message overhead
+        if model.startswith('gpt-4o'):
+            tokens_per_message = 3
+            tokens_per_name = 1
+        elif model.startswith('gpt-3.5-turbo') or model.startswith('gpt-4'):
+            tokens_per_message = 3
+            tokens_per_name = 1
+        else:
+            # Conservative default
+            tokens_per_message = 3
+            tokens_per_name = 1
+
+        num_tokens = 0
+        for message in messages:
+            num_tokens += tokens_per_message
+            for key, value in message.items():
+                if key == 'content' and value:
+                    num_tokens += len(encoding.encode(value))
+                elif key == 'tool_calls':
+                    for tool in value:
+                        # Overhead for tool calls within a message
+                        num_tokens += len(encoding.encode(tool['function']['name']))
+                        num_tokens += len(encoding.encode(tool['function']['arguments']))
+                        # There is usually a small overhead for the tool_calls structure itself,
+                        # but it's not officially documented. +3 is a safe buffer.
+                        num_tokens += 3
+                elif key == 'name':
+                    num_tokens += len(encoding.encode(value))
+                    num_tokens += tokens_per_name
+                elif key == 'role':
+                    pass  # Role is handled by tokens_per_message overhead
+
+        num_tokens += 3  # Every reply is primed with <|start|>assistant<|message|>
+        return num_tokens
