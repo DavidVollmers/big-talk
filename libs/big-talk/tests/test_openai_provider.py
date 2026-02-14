@@ -30,9 +30,11 @@ def create_tool_chunk(index, id=None, name=None, args=None):
 
 
 @pytest.fixture
-def openai_provider():
+def openai_provider(monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "dummy-key-for-tests")
     provider = OpenAIProvider()
     provider._client = MagicMock()
+    provider._client.chat.completions.create = AsyncMock()
     return provider
 
 
@@ -93,9 +95,7 @@ def test_openai_token_counting_with_tools(openai_provider):
         pass
 
     tools = [Tool.from_func(my_tool)]
-    messages = [Message(role="user", content="hi")]
-
-    count = openai_provider.count_tokens("gpt-4", messages, tools=tools)  # Note: this is async in your code
+    messages = [UserMessage(role="user", content="hi", id="u1")]
 
     # We just want to ensure it runs without error and returns a number > 0
     # since exact count depends on the mock encoding logic.

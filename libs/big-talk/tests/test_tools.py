@@ -13,7 +13,12 @@ async def test_stream_normalizes_tools(simple_message):
 
     bt = BigTalk()
     mock_provider = MagicMock()
-    mock_provider.stream.return_value = AsyncMock().__aiter__.return_value = []  # Empty stream
+
+    async def mock_stream_gen(*args, **kwargs):
+        if False:
+            yield
+
+    mock_provider.stream.side_effect = mock_stream_gen
 
     bt.add_provider("mock", lambda: mock_provider)
 
