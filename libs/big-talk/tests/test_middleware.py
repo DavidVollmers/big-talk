@@ -1,6 +1,6 @@
 import pytest
 
-from big_talk import Message
+from big_talk import Message, AssistantMessage
 
 
 @pytest.mark.asyncio
@@ -58,18 +58,18 @@ async def test_middleware_context_mutation(bigtalk, create_provider, simple_mess
 
 
 @pytest.mark.asyncio
-async def test_middleware_short_circuit(bigtalk, create_provider):
+async def test_middleware_short_circuit(bigtalk, create_provider, simple_message):
     """Test middleware returning early (caching) without calling handler."""
     provider = create_provider()
     bigtalk.add_provider("test", lambda: provider)
 
     async def cache_middleware(handler, ctx, **kwargs):
         # Don't call handler, just yield mock response
-        yield Message(role="assistant", content="cached_response")
+        yield AssistantMessage(role="assistant", content="cached_response", id="cached_id")
 
     bigtalk.add_middleware(cache_middleware)
 
-    results = [m async for m in bigtalk.stream("test/m", [])]
+    results = [m async for m in bigtalk.stream("test/m", [simple_message])]
 
     assert len(results) == 1
     assert results[0]['content'] == "cached_response"
@@ -77,7 +77,7 @@ async def test_middleware_short_circuit(bigtalk, create_provider):
 
 
 @pytest.mark.asyncio
-async def test_middleware_argument_injection(bigtalk, create_provider):
+async def test_middleware_argument_injection(bigtalk, create_provider, simple_message):
     provider = create_provider()
     bigtalk.add_provider("test", lambda: provider)
 
@@ -88,14 +88,14 @@ async def test_middleware_argument_injection(bigtalk, create_provider):
 
     bigtalk.add_middleware(inject_middleware)
 
-    async for _ in bigtalk.stream("test/m", []):
+    async for _ in bigtalk.stream("test/m", [simple_message]):
         pass
 
     assert provider.stream_calls[0]["kwargs"]["temperature"] == 0.99
 
 
 @pytest.mark.asyncio
-async def test_middleware_can_resolve_provider_manually(bigtalk, create_provider):
+async def test_middleware_can_resolve_provider_manually(bigtalk, create_provider, simple_message):
     """Test that middleware can ask 'who is the provider?' before streaming."""
     provider = create_provider()
     bigtalk.add_provider("test", lambda: provider)
@@ -110,7 +110,7 @@ async def test_middleware_can_resolve_provider_manually(bigtalk, create_provider
             yield msg
 
     bigtalk.add_middleware(inspection_middleware)
-    async for _ in bigtalk.stream("test/m", []):
+    async for _ in bigtalk.stream("test/m", [simple_message]):
         pass
 
     assert resolved_provider is provider

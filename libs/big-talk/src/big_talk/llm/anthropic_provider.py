@@ -70,12 +70,12 @@ class AnthropicProvider(LLMProvider):
                 if isinstance(content, str):
                     system_parts.append(content)
                 else:
-                    last_user_message_id = message['id']
                     converted.append(MessageParam(
                         role='user',
                         content=[AnthropicProvider._convert_tool_result(block) for block in content]
                     ))
             elif role == 'user':
+                last_user_message_id = message['id']
                 converted.append(MessageParam(
                     role='user',
                     content=content
