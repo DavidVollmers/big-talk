@@ -7,3 +7,4 @@ dependencies = []
 
 [project.optional-dependencies]
 anthropic = ["anthropic>=0.79.0"]
+openai = ["openai>=2.21.0", "tiktoken>=0.12.0"]
