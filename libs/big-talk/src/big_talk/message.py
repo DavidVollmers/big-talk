@@ -1,4 +1,4 @@
-from typing import TypedDict, Literal, Any, Union, TypeAlias, Iterable
+from typing import TypedDict, Literal, Any, Union, TypeAlias, Sequence
 
 
 class ToolUse(TypedDict):
@@ -27,21 +27,24 @@ class Thinking(TypedDict):
 
 
 class UserMessage(TypedDict):
+    id: str
     role: Literal['user']
     content: str
 
 
 class SystemMessage(TypedDict):
     role: Literal['system']
-    content: Union[str, Iterable[ToolResult]]
+    content: Union[str, Sequence[ToolResult]]
 
 
 AssistantContentBlock: TypeAlias = Union[Text, Thinking, ToolUse]
 
 
 class AssistantMessage(TypedDict):
+    id: str
     role: Literal['assistant']
-    content: Iterable[AssistantContentBlock]
+    content: Sequence[AssistantContentBlock]
+    is_aggregate: bool
 
 
 Message: TypeAlias = Union[UserMessage, SystemMessage, AssistantMessage]

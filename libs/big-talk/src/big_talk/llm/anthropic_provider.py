@@ -1,4 +1,4 @@
-from typing import Iterable, AsyncGenerator, Union
+from typing import Sequence, AsyncGenerator, Union
 
 from anthropic import Omit, omit
 from anthropic.types import MessageParam, ToolResultBlockParam, ThinkingBlockParam, TextBlockParam, ToolUseBlockParam
@@ -21,12 +21,12 @@ class AnthropicProvider(LLMProvider):
     async def close(self):
         await self._client.close()
 
-    async def count_tokens(self, model: str, messages: Iterable[Message], **kwargs) -> int:
+    async def count_tokens(self, model: str, messages: Sequence[Message], **kwargs) -> int:
         system, converted = self._convert_messages(messages)
         result = await self._client.messages.count_tokens(model=model, system=system, messages=converted, **kwargs)
         return result.input_tokens
 
-    async def stream(self, model: str, messages: Iterable[Message], **kwargs) -> AsyncGenerator[Message, None]:
+    async def stream(self, model: str, messages: Sequence[Message], **kwargs) -> AsyncGenerator[Message, None]:
         system, converted = self._convert_messages(messages)
         async with self._client.messages.stream(model=model, system=system, messages=converted, **kwargs) as stream:
             async for chunk in stream:
@@ -48,7 +48,7 @@ class AnthropicProvider(LLMProvider):
                 yield Message(role='assistant', content=[block])
 
     @staticmethod
-    def _convert_messages(messages: Iterable[Message]) -> tuple[str | Omit, list[MessageParam]]:
+    def _convert_messages(messages: Sequence[Message]) -> tuple[str | Omit, list[MessageParam]]:
         system_parts = []
         converted = []
         for message in messages:

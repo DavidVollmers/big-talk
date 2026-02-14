@@ -1,5 +1,5 @@
 import asyncio
-from typing import AsyncGenerator, Iterable
+from typing import AsyncGenerator, Sequence
 from big_talk.llm import LLMProvider
 from big_talk import Message
 from big_talk.streaming import StreamContext, StreamHandler
@@ -13,10 +13,10 @@ class TestLLMProvider(LLMProvider):
         self.stream_calls: list[dict] = []
         self.close_called = False
 
-    async def count_tokens(self, model: str, messages: Iterable[Message], **kwargs) -> int:
+    async def count_tokens(self, model: str, messages: Sequence[Message], **kwargs) -> int:
         return len(self.responses)
 
-    async def stream(self, model: str, messages: Iterable[Message], **kwargs) -> AsyncGenerator[Message, None]:
+    async def stream(self, model: str, messages: Sequence[Message], **kwargs) -> AsyncGenerator[Message, None]:
         # Store calls for verification
         self.stream_calls.append({
             "model": model,

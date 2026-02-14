@@ -1,4 +1,4 @@
-from typing import Iterable, AsyncGenerator
+from typing import Sequence, AsyncGenerator
 
 from openai.types.chat import ChatCompletionMessageParam, ChatCompletionUserMessageParam
 
@@ -23,7 +23,7 @@ class OpenAIProvider(LLMProvider):
         await self._client.close()
 
     @staticmethod
-    def _transform_messages(messages: Iterable[Message]) -> list[ChatCompletionMessageParam]:
+    def _transform_messages(messages: Sequence[Message]) -> list[ChatCompletionMessageParam]:
         transformed_messages = []
         for message in messages:
             if message['role'] == 'user':
@@ -33,13 +33,13 @@ class OpenAIProvider(LLMProvider):
                 ))
         return transformed_messages
 
-    async def count_tokens(self, model: str, messages: Iterable[Message], **kwargs) -> int:
+    async def count_tokens(self, model: str, messages: Sequence[Message], **kwargs) -> int:
         # encoding = self._encoding_for_model(model)
         # TODO https://developers.openai.com/cookbook/examples/how_to_count_tokens_with_tiktoken/
         raise NotImplementedError(
             'Token counting is not implemented for OpenAIProvider yet. Please use the tiktoken library directly.')
 
-    async def stream(self, model: str, messages: Iterable[Message], **kwargs) -> AsyncGenerator[Message, None]:
+    async def stream(self, model: str, messages: Sequence[Message], **kwargs) -> AsyncGenerator[Message, None]:
         transformed_messages = self._transform_messages(messages)
         response = await self._client.chat.completions.create(model=model, messages=transformed_messages, stream=True,
                                                               **kwargs)

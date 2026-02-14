@@ -4,7 +4,7 @@ from dinkleberg.fastapi import di
 from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
 
-from big_talk import BigTalk, Message
+from big_talk import BigTalk, UserMessage
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +17,9 @@ async def stream_talk(request: Request, bt=di(BigTalk)):
 
     async def event_generator():
         async for message in bt.stream(model='anthropic/claude-haiku-4-5',
-                                       messages=[Message(role='user', content='Write a haiku about the sea.')]):
+                                       messages=[UserMessage(id='1',
+                                                             role='user',
+                                                             content='Write a haiku about streaming responses in FastAPI.')]):
             if await request.is_disconnected():
                 logger.info('Client disconnected, stopping stream')
                 break

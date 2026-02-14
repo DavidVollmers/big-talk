@@ -1,6 +1,6 @@
 import asyncio
 from collections.abc import AsyncGenerator
-from typing import Iterable, Any
+from typing import Sequence, Any
 
 from .llm import LLMProvider, LLMProviderFactory
 from .message import Message
@@ -66,7 +66,7 @@ class BigTalk:
         provider, model_name = self._parse_model(model)
         return self._get_provider(provider), model_name
 
-    async def stream(self, model: str, messages: Iterable[Message], **kwargs: Any) -> AsyncGenerator[Message, None]:
+    async def stream(self, model: str, messages: Sequence[Message], **kwargs: Any) -> AsyncGenerator[Message, None]:
         ctx = StreamContext(model=model, messages=messages, _provider_resolver=self._get_llm_provider)
         handler = self._build_middleware_stack()
         async for message in handler(ctx, **kwargs):

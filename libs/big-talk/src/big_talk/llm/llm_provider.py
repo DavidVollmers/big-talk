@@ -1,16 +1,16 @@
 from abc import ABC, abstractmethod
-from typing import Iterable, AsyncGenerator
+from typing import Sequence, AsyncGenerator
 
 from ..message import Message
 
 
 class LLMProvider(ABC):
     @abstractmethod
-    async def count_tokens(self, model: str, messages: Iterable[Message], **kwargs) -> int:
+    async def count_tokens(self, model: str, messages: Sequence[Message], **kwargs) -> int:
         pass
 
     @abstractmethod
-    def stream(self, model: str, messages: Iterable[Message], **kwargs) -> AsyncGenerator[Message, None]:
+    def stream(self, model: str, messages: Sequence[Message], **kwargs) -> AsyncGenerator[Message, None]:
         pass
 
     async def close(self):
