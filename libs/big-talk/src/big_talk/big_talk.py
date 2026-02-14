@@ -31,7 +31,8 @@ class BigTalk:
     def __init__(self):
         self._providers: dict[str, LLMProvider] = {}
         self._provider_factories: dict[str, LLMProviderFactory] = {
-            'anthropic': self._anthropic_provider_factory
+            'anthropic': self._anthropic_provider_factory,
+            'openai': self._openai_provider_factory,
         }
         self._middleware: list[StreamMiddleware] = []
 
