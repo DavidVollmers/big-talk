@@ -16,13 +16,14 @@ class ToolResult(TypedDict):
 
 
 class Text(TypedDict):
-    type: Literal['content']
+    type: Literal['text']
     text: str
 
 
 class Thinking(TypedDict):
     type: Literal['thinking']
     thinking: str
+    signature: str
 
 
 class UserMessage(TypedDict):
@@ -35,9 +36,12 @@ class SystemMessage(TypedDict):
     content: Union[str, Iterable[ToolResult]]
 
 
+AssistantContentBlock: TypeAlias = Union[Text, Thinking, ToolUse]
+
+
 class AssistantMessage(TypedDict):
     role: Literal['assistant']
-    content: Iterable[Union[Text, Thinking, ToolUse]]
+    content: Iterable[AssistantContentBlock]
 
 
 Message: TypeAlias = Union[UserMessage, SystemMessage, AssistantMessage]

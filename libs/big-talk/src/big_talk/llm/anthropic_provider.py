@@ -1,10 +1,10 @@
 from typing import Iterable, AsyncGenerator, Union
 
 from anthropic import Omit, omit
-from anthropic.types import MessageParam, ToolResultBlockParam, ThinkingBlockParam
+from anthropic.types import MessageParam, ToolResultBlockParam, ThinkingBlockParam, TextBlockParam, ToolUseBlockParam
 
 from .llm_provider import LLMProvider
-from ..message import Message, Text, Thinking, ToolUse
+from ..message import Message, AssistantContentBlock, ToolResult, ToolUse, Text
 
 
 class AnthropicProvider(LLMProvider):
@@ -30,8 +30,22 @@ class AnthropicProvider(LLMProvider):
         system, converted = self._convert_messages(messages)
         async with self._client.messages.stream(model=model, system=system, messages=converted, **kwargs) as stream:
             async for chunk in stream:
-                if chunk.type == 'content_block_stop' and chunk.content_block.type == 'text':
-                    yield Message(role='assistant', content=chunk.content_block.text)
+                if chunk.type != 'content_block_stop':
+                    continue
+
+                if chunk.content_block.type == 'text':
+                    block = Text(type='text', text=chunk.content_block.text)
+                elif chunk.content_block.type == 'thinking':
+                    block = ThinkingBlockParam(type='thinking',
+                                               thinking=chunk.content_block.thinking,
+                                               signature=chunk.content_block.signature)
+                elif chunk.content_block.type == 'tool_use':
+                    block = ToolUse(type='tool_use', id=chunk.content_block.id, name=chunk.content_block.name,
+                                    params=chunk.content_block.input)
+                else:
+                    continue
+
+                yield Message(role='assistant', content=[block])
 
     @staticmethod
     def _convert_messages(messages: Iterable[Message]) -> tuple[str | Omit, list[MessageParam]]:
@@ -46,14 +60,7 @@ class AnthropicProvider(LLMProvider):
                 else:
                     converted.append(MessageParam(
                         role='user',
-                        content=[
-                            ToolResultBlockParam(
-                                type='tool_result',
-                                tool_use_id=block['tool_use_id'],
-                                content=block['result'],
-                                is_error=block['is_error']
-                            ) for block in content if block['type'] == 'tool_result'
-                        ]
+                        content=[AnthropicProvider._convert_tool_result(block) for block in content]
                     ))
             elif role == 'user':
                 converted.append(MessageParam(
@@ -70,5 +77,22 @@ class AnthropicProvider(LLMProvider):
         return system, converted
 
     @staticmethod
-    def _convert_block(block: Union[Text, Thinking, ToolUse]) -> Union[ThinkingBlockParam]:
-        pass
+    def _convert_tool_result(block: ToolResult) -> ToolResultBlockParam:
+        match block:
+            case {'type': 'tool_result', 'tool_use_id': tool_use_id, 'result': result, 'is_error': is_error}:
+                return ToolResultBlockParam(type='tool_result', tool_use_id=tool_use_id, content=result,
+                                            is_error=is_error)
+            case _:
+                raise ValueError(f'Expected tool result block, got: {block}')
+
+    @staticmethod
+    def _convert_block(block: AssistantContentBlock) -> Union[TextBlockParam, ThinkingBlockParam, ToolUseBlockParam]:
+        match block:
+            case {'type': 'text', 'text': text}:
+                return TextBlockParam(type='text', text=text)
+            case {'type': 'thinking', 'thinking': thinking, 'signature': signature}:
+                return ThinkingBlockParam(type='thinking', thinking=thinking, signature=signature)
+            case {'type': 'tool_use', 'id': tool_use_id, 'name': name, 'params': params}:
+                return ToolUseBlockParam(type='tool_use', id=tool_use_id, name=name, input=params)
+            case _:
+                raise ValueError(f'Unsupported content block: {block}')
