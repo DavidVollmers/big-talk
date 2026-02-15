@@ -1,30 +1,11 @@
 import asyncio
 from typing import Sequence, Any, AsyncGenerator, Callable
 
+from .middleware import MiddlewareStack
+from .streaming import StreamContext, StreamingMiddlewareStack, BaseStreamHandler
 from .tool import Tool
 from .llm import LLMProvider, LLMProviderFactory
 from .message import Message
-from .streaming import StreamContext, StreamMiddleware, StreamHandler, CallableStreamMiddleware, StreamMiddlewareBase
-
-
-class _CallableMiddlewareWrapper(CallableStreamMiddleware):
-    def __init__(self, call: CallableStreamMiddleware):
-        self._call = call
-
-    async def __call__(self, handler: StreamHandler, ctx: StreamContext, **kwargs: Any) \
-            -> AsyncGenerator[Message, None]:
-        async for message in self._call(handler, ctx, **kwargs):
-            yield message
-
-
-class _MiddlewareWrapper(StreamHandler):
-    def __init__(self, mw: StreamMiddleware, next_handler: StreamHandler):
-        self._mw = mw
-        self._next_handler = next_handler
-
-    async def __call__(self, ctx: StreamContext, **kwargs: Any) -> AsyncGenerator[Message, None]:
-        async for message in self._mw(self._next_handler, ctx, **kwargs):
-            yield message
 
 
 class BigTalk:
@@ -34,12 +15,11 @@ class BigTalk:
             'anthropic': self._anthropic_provider_factory,
             'openai': self._openai_provider_factory,
         }
-        self._middleware: list[StreamMiddleware] = []
+        self._streaming: StreamingMiddlewareStack = MiddlewareStack(BaseStreamHandler())
 
-    def add_middleware(self, middleware: StreamMiddleware) -> None:
-        if not isinstance(middleware, StreamMiddlewareBase):
-            middleware = _CallableMiddlewareWrapper(middleware)
-        self._middleware.append(middleware)
+    @property
+    def streaming(self) -> StreamingMiddlewareStack:
+        return self._streaming
 
     def add_provider(self, name: str, provider_factory: LLMProviderFactory, override: bool = False) -> None:
         if not override and (name in self._providers or name in self._provider_factories):
@@ -74,20 +54,15 @@ class BigTalk:
         if not any(message['role'] == 'user' for message in messages):
             raise ValueError('At least one user message is required to generate a response.')
 
-        normalized_tools = []
-        if tools:
-            for t in tools:
-                if isinstance(t, Tool):
-                    normalized_tools.append(t)
-                elif callable(t):
-                    normalized_tools.append(Tool.from_func(t))
-                else:
-                    raise TypeError(f'Invalid tool type: {type(t)}')
+        normalized_tools = self._normalize_tools(tools)
+
+        # current_history = list(messages)
+
+        stream_handler = self._streaming.build()
 
         ctx = StreamContext(model=model, tools=normalized_tools, messages=messages,
                             _provider_resolver=self._get_llm_provider)
-        handler = self._build_middleware_stack()
-        async for message in handler(ctx, **kwargs):
+        async for message in stream_handler(ctx, **kwargs):
             # TODO handle tool calls and results
             yield message
 
@@ -104,13 +79,17 @@ class BigTalk:
         async for message in provider.stream(model=model_name, messages=ctx.messages, **kwargs):
             yield message
 
-    def _build_middleware_stack(self) -> StreamHandler:
-        handler = self._llm_stream
-
-        for middleware in reversed(self._middleware):
-            handler = _MiddlewareWrapper(middleware, handler)
-
-        return handler
+    @staticmethod
+    def _normalize_tools(tools: Sequence[Callable | Tool]) -> list[Tool]:
+        normalized = []
+        for t in tools:
+            if isinstance(t, Tool):
+                normalized.append(t)
+            elif callable(t):
+                normalized.append(Tool.from_func(t))
+            else:
+                raise TypeError(f'Invalid tool type: {type(t)}')
+        return normalized
 
     @staticmethod
     def _anthropic_provider_factory() -> LLMProvider:
