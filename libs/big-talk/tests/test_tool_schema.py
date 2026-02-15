@@ -1,4 +1,7 @@
 from typing import TypedDict, Annotated, Literal, List
+
+from pydantic import BaseModel, Field
+
 from big_talk.tool import Tool
 
 
@@ -82,3 +85,23 @@ def test_annotated_stripping_bug_fix():
     tool = Tool.from_func(func)
     # If this fails, you forgot include_extras=True in get_type_hints
     assert "Must be positive" in tool.parameters["properties"]["val"]["description"]
+
+
+def test_pydantic_model_support():
+    class User(BaseModel):
+        id: int = Field(..., description="User ID")
+        name: str = Field(..., description="Full Name")
+
+    def create_user(user: User):
+        """Creates a new user."""
+        pass
+
+    tool = Tool.from_func(create_user)
+
+    props = tool.parameters["properties"]
+
+    # Check if Pydantic schema was embedded correctly
+    assert props["user"]["type"] == "object"
+    assert props["user"]["properties"]["id"]["type"] == "integer"
+    assert "User ID" in props["user"]["properties"]["id"]["description"]
+    assert "id" in props["user"]["required"]

@@ -32,7 +32,8 @@ class DictionaryProperty(Property):
     additionalProperties: bool
 
 
-ToolParametersProperty: TypeAlias = Union[Property, EnumProperty, ArrayProperty, ObjectProperty, DictionaryProperty]
+ToolParametersProperty: TypeAlias = Union[
+    Property, EnumProperty, ArrayProperty, ObjectProperty, DictionaryProperty, dict[str, Any]]
 
 
 class ToolParameters(TypedDict):
@@ -106,6 +107,15 @@ class Tool:
                 if isinstance(arg, str):
                     description = arg
                     break
+
+        # Pydantic support
+        if hasattr(t, 'model_json_schema') and callable(t.model_json_schema):
+            # noinspection PyTypeChecker
+            schema: dict[str, Any] = t.model_json_schema()
+            schema.pop('title', None)
+            if description:
+                schema['description'] = description
+            return schema
 
         # Handle basic types
         if t == str:
