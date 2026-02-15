@@ -18,10 +18,12 @@ class StreamContext:
         return self._provider_resolver(self.model)
 
 
+StreamHandler: TypeAlias = MiddlewareHandler[StreamContext, AsyncGenerator[Message, None]]
+
 StreamingMiddlewareStack: TypeAlias = MiddlewareStack[StreamContext, AsyncGenerator[Message, None]]
 
 
-class BaseStreamHandler(MiddlewareHandler[StreamContext, AsyncGenerator[Message, None]]):
+class BaseStreamHandler(StreamHandler):
     async def __call__(self, ctx: StreamContext, **kwargs: Any) -> AsyncGenerator[Message, None]:
         provider, model_name = ctx.get_llm_provider()
         async for message in provider.stream(

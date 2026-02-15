@@ -80,8 +80,12 @@ class BigTalk:
             yield message
 
     @staticmethod
-    def _normalize_tools(tools: Sequence[Callable | Tool]) -> list[Tool]:
+    def _normalize_tools(tools: Sequence[Callable | Tool] | None) -> list[Tool]:
         normalized = []
+
+        if not tools:
+            return normalized
+
         for t in tools:
             if isinstance(t, Tool):
                 normalized.append(t)
@@ -89,6 +93,7 @@ class BigTalk:
                 normalized.append(Tool.from_func(t))
             else:
                 raise TypeError(f'Invalid tool type: {type(t)}')
+
         return normalized
 
     @staticmethod

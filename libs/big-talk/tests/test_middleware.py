@@ -1,6 +1,6 @@
 import pytest
 
-from big_talk import Message, AssistantMessage
+from big_talk import AssistantMessage
 
 
 @pytest.mark.asyncio
@@ -21,8 +21,8 @@ async def test_middleware_execution_order(bigtalk, create_provider, simple_messa
         call_log.append("mw2_exit")
 
     bigtalk.add_provider("test", lambda: create_provider())
-    bigtalk.add_middleware(mw1)
-    bigtalk.add_middleware(mw2)
+    bigtalk.streaming.use(mw1)
+    bigtalk.streaming.use(mw2)
 
     async for _ in bigtalk.stream("test/model", [simple_message]):
         pass
@@ -45,7 +45,7 @@ async def test_middleware_context_mutation(bigtalk, create_provider, simple_mess
         async for msg in handler(ctx, **kwargs):
             yield msg
 
-    bigtalk.add_middleware(router_middleware)
+    bigtalk.streaming.use(router_middleware)
 
     # Call with A
     async for _ in bigtalk.stream("provA/expensive", [simple_message]):
@@ -65,9 +65,10 @@ async def test_middleware_short_circuit(bigtalk, create_provider, simple_message
 
     async def cache_middleware(handler, ctx, **kwargs):
         # Don't call handler, just yield mock response
+        # noinspection PyArgumentList
         yield AssistantMessage(role="assistant", content="cached_response", id="cached_id")
 
-    bigtalk.add_middleware(cache_middleware)
+    bigtalk.streaming.use(cache_middleware)
 
     results = [m async for m in bigtalk.stream("test/m", [simple_message])]
 
@@ -86,7 +87,7 @@ async def test_middleware_argument_injection(bigtalk, create_provider, simple_me
         async for msg in handler(ctx, **kwargs):
             yield msg
 
-    bigtalk.add_middleware(inject_middleware)
+    bigtalk.streaming.use(inject_middleware)
 
     async for _ in bigtalk.stream("test/m", [simple_message]):
         pass
@@ -109,7 +110,7 @@ async def test_middleware_can_resolve_provider_manually(bigtalk, create_provider
         async for msg in handler(ctx, **kwargs):
             yield msg
 
-    bigtalk.add_middleware(inspection_middleware)
+    bigtalk.streaming.use(inspection_middleware)
     async for _ in bigtalk.stream("test/m", [simple_message]):
         pass
 
