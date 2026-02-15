@@ -95,7 +95,8 @@ class BigTalk:
                 messages=current_history
             )
 
-            tool_results = await asyncio.gather(*tool_execution_handler(tool_execution_ctx))
+            tool_tasks = await tool_execution_handler(tool_execution_ctx)
+            tool_results = await asyncio.gather(*tool_tasks)
 
             current_history.append(SystemMessage(
                 role='system',

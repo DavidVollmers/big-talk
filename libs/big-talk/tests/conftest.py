@@ -11,6 +11,12 @@ def bigtalk():
 
 
 @pytest.fixture
+def bt():
+    """Returns a fresh BigTalk instance for every test."""
+    return BigTalk()
+
+
+@pytest.fixture
 def create_provider():
     """Factory fixture to create providers easily."""
 

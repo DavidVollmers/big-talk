@@ -14,9 +14,10 @@ class ToolExecutionContext:
     messages: Sequence[Message]
 
 
-ToolExecutionHandler: TypeAlias = MiddlewareHandler[ToolExecutionContext, Iterable[Awaitable[ToolResult]]]
+ToolExecutionHandler: TypeAlias = MiddlewareHandler[ToolExecutionContext, Awaitable[Iterable[Awaitable[ToolResult]]]]
 
-ToolExecutionMiddlewareStack: TypeAlias = MiddlewareStack[ToolExecutionContext, Iterable[Awaitable[ToolResult]]]
+ToolExecutionMiddlewareStack: TypeAlias = MiddlewareStack[
+    ToolExecutionContext, Awaitable[Iterable[Awaitable[ToolResult]]]]
 
 
 class BaseToolExecutionHandler(ToolExecutionHandler):
