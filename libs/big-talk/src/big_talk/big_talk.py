@@ -81,7 +81,7 @@ class BigTalk:
                 yield message
 
                 if not message['is_aggregate']:
-                    break
+                    continue
 
                 current_history.append(message)
 
@@ -96,7 +96,7 @@ class BigTalk:
                 messages=current_history
             )
 
-            tool_results = [r async for r in tool_execution_handler(tool_execution_ctx)]
+            tool_results = await asyncio.gather(*tool_execution_handler(tool_execution_ctx))
 
             current_history.append(SystemMessage(
                 role='system',
