@@ -72,7 +72,7 @@ class BigTalk:
         tool_execution_handler = self._tool_execution.build()
 
         for iteration in range(max_iterations):
-            stream_ctx = StreamContext(model=model, tools=normalized_tools, messages=messages,
+            stream_ctx = StreamContext(model=model, tools=normalized_tools, messages=current_history,
                                        _provider_resolver=self._get_llm_provider)
 
             tool_uses: list[ToolUse] = []
