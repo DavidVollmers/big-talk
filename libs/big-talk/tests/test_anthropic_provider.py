@@ -1,8 +1,8 @@
 import pytest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from big_talk import SystemMessage, UserMessage
-from big_talk.llm.anthropic_provider import AnthropicProvider
+from big_talk.llm.anthropic import AnthropicProvider
 from big_talk.message import Message, ToolResult
 
 
@@ -87,3 +87,29 @@ async def test_anthropic_streaming(anthropic_provider):
     # Check Aggregate
     assert results[2]["is_aggregate"] is True
     assert len(results[2]["content"]) == 2  # Should contain both text and tool
+
+
+def test_anthropic_init_kwargs():
+    """Test that kwargs are passed to the underlying AsyncAnthropic client."""
+
+    # We patch the class where it is IMPORTED, not where it is defined.
+    # Since AnthropicProvider imports it inside __init__, we need to patch
+    # 'anthropic.AsyncAnthropic' globally or mock the module.
+
+    with patch("anthropic.AsyncAnthropic") as MockClient:
+        # Initialize with custom args
+        provider = AnthropicProvider(
+            api_key="my-secret-key",
+            max_retries=5,
+            timeout=20.0
+        )
+
+        # Verify the client was initialized with these args
+        MockClient.assert_called_once_with(
+            api_key="my-secret-key",
+            max_retries=5,
+            timeout=20.0
+        )
+
+        # Verify the instance is stored
+        assert provider._client == MockClient.return_value

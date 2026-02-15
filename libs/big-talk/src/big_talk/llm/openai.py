@@ -16,11 +16,11 @@ if TYPE_CHECKING:
 
 
 class OpenAIProvider(LLMProvider):
-    def __init__(self):
+    def __init__(self, **kwargs):
         try:
             from openai import AsyncOpenAI
             from tiktoken import encoding_for_model
-            self._client = AsyncOpenAI()
+            self._client = AsyncOpenAI(**kwargs)
             self._encoding_for_model = encoding_for_model
         except ImportError:
             raise ImportError(

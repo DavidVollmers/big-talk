@@ -1,4 +1,8 @@
+from unittest.mock import MagicMock
+
 import pytest
+
+from big_talk import BigTalk
 
 
 @pytest.mark.asyncio
@@ -102,3 +106,66 @@ async def test_global_close(bigtalk, create_provider, simple_message):
 
     assert p1.close_called
     assert p2.close_called
+
+
+def test_add_provider_duplicate_error():
+    """Ensure adding a duplicate provider raises ValueError by default."""
+    bt = BigTalk()
+    mock_factory = lambda: MagicMock()
+
+    # 1. Add first time
+    bt.add_provider("test_provider", mock_factory)
+
+    # 2. Add second time (should fail)
+    with pytest.raises(ValueError, match='Provider "test_provider" is already registered'):
+        bt.add_provider("test_provider", mock_factory)
+
+
+def test_add_provider_override_success():
+    """Ensure override=True replaces the provider and clears the cache."""
+    bt = BigTalk()
+
+    # Setup two different mocks to distinguish them
+    factory_1 = MagicMock(return_value="Provider 1")
+    factory_2 = MagicMock(return_value="Provider 2")
+
+    # 1. Register first provider
+    bt.add_provider("my_llm", factory_1)
+
+    # 2. Instantiate it (to populate _providers cache)
+    # We access the private method or just use get_llm_provider logic if exposed
+    # For testing, we can simulate the cache population:
+    bt._providers["my_llm"] = factory_1()
+    assert bt._providers["my_llm"] == "Provider 1"
+
+    # 3. Override with second provider
+    bt.add_provider("my_llm", factory_2, override=True)
+
+    # 4. Assertions
+    # Factory should be updated
+    assert bt._provider_factories["my_llm"] == factory_2
+
+    # Cache should be CLEARED (critical for correct lifecycle management)
+    assert "my_llm" not in bt._providers
+
+    # 5. Verify the new provider is used on next access
+    # (Assuming we have a way to access it, or just checking internal state)
+    assert bt._provider_factories["my_llm"] is factory_2
+
+
+def test_override_default_provider_with_kwargs():
+    """Verify a user can override the default 'anthropic' provider with a configured one."""
+    bt = BigTalk()
+
+    # User wants to set a specific timeout
+    def configured_anthropic_factory():
+        # This requires the real package or a mock,
+        # so for unit tests we usually mock the Provider class itself
+        mock_provider = MagicMock()
+        mock_provider.name = "configured"
+        return mock_provider
+
+    bt.add_provider("anthropic", configured_anthropic_factory, override=True)
+
+    # Ensure the override worked
+    assert bt._provider_factories["anthropic"] == configured_anthropic_factory

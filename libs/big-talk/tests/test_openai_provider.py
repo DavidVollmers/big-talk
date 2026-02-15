@@ -1,8 +1,8 @@
 import pytest
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from big_talk import UserMessage
-from big_talk.llm.openai_provider import OpenAIProvider
+from big_talk.llm.openai import OpenAIProvider
 from big_talk.message import Message
 from big_talk.tool import Tool
 
@@ -104,3 +104,24 @@ def test_openai_token_counting_with_tools(openai_provider):
     count = asyncio.run(openai_provider.count_tokens("gpt-4", messages, tools=tools))
 
     assert count > 0
+
+
+def test_openai_init_kwargs():
+    """Test that kwargs are passed to the underlying AsyncOpenAI client."""
+
+    with patch("openai.AsyncOpenAI") as MockClient:
+        # Initialize with custom args
+        provider = OpenAIProvider(
+            api_key="sk-test-123",
+            organization="org-456",
+            timeout=15.0
+        )
+
+        # Verify the client was initialized with these args
+        MockClient.assert_called_once_with(
+            api_key="sk-test-123",
+            organization="org-456",
+            timeout=15.0
+        )
+
+        assert provider._client == MockClient.return_value

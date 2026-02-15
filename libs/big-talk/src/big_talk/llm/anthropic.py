@@ -9,10 +9,10 @@ from ..message import Message, AssistantContentBlock, ToolResult, ToolUse, Text,
 
 
 class AnthropicProvider(LLMProvider):
-    def __init__(self):
+    def __init__(self, **kwargs):
         try:
             from anthropic import AsyncAnthropic
-            self._client = AsyncAnthropic()
+            self._client = AsyncAnthropic(**kwargs)
         except ImportError:
             raise ImportError(
                 'The "anthropic" package is required to use the AnthropicProvider. '

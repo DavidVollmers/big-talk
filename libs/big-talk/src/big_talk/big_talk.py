@@ -36,15 +36,17 @@ class BigTalk:
         }
         self._middleware: list[StreamMiddleware] = []
 
-    def add_middleware(self, middleware: StreamMiddleware):
+    def add_middleware(self, middleware: StreamMiddleware) -> None:
         if not isinstance(middleware, StreamMiddlewareBase):
             middleware = _CallableMiddlewareWrapper(middleware)
         self._middleware.append(middleware)
 
-    def add_provider(self, name: str, provider_factory: LLMProviderFactory):
-        if name in self._providers or name in self._provider_factories:
+    def add_provider(self, name: str, provider_factory: LLMProviderFactory, override: bool = False) -> None:
+        if not override and (name in self._providers or name in self._provider_factories):
             raise ValueError(f'Provider "{name}" is already registered.')
         self._provider_factories[name] = provider_factory
+        if name in self._providers:
+            del self._providers[name]
 
     @staticmethod
     def _parse_model(model: str) -> tuple[str, str]:
@@ -112,10 +114,10 @@ class BigTalk:
 
     @staticmethod
     def _anthropic_provider_factory() -> LLMProvider:
-        from .llm.anthropic_provider import AnthropicProvider
+        from .llm.anthropic import AnthropicProvider
         return AnthropicProvider()
 
     @staticmethod
     def _openai_provider_factory() -> LLMProvider:
-        from .llm.openai_provider import OpenAIProvider
+        from .llm.openai import OpenAIProvider
         return OpenAIProvider()
