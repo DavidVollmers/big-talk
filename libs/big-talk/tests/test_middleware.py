@@ -1,6 +1,6 @@
 import pytest
 
-from big_talk import AssistantMessage
+from big_talk import AssistantMessage, Text
 
 
 @pytest.mark.asyncio
@@ -65,15 +65,15 @@ async def test_middleware_short_circuit(bigtalk, create_provider, simple_message
 
     async def cache_middleware(handler, ctx, **kwargs):
         # Don't call handler, just yield mock response
-        # noinspection PyArgumentList
-        yield AssistantMessage(role="assistant", content="cached_response", id="cached_id")
+        yield AssistantMessage(role="assistant", content=[Text(type="text", text="cached_response")], id="cached_id",
+                               parent_id="cached_parent", is_aggregate=True)
 
     bigtalk.streaming.use(cache_middleware)
 
     results = [m async for m in bigtalk.stream("test/m", [simple_message])]
 
     assert len(results) == 1
-    assert results[0]['content'] == "cached_response"
+    assert results[0]['content'][0]['text'] == "cached_response"
     assert len(provider.stream_calls) == 0  # LLM never touched
 
 

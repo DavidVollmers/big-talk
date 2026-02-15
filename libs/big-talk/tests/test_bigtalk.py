@@ -18,7 +18,7 @@ async def test_happy_path_routing(bigtalk, create_provider, simple_message):
 
     # Assert
     assert len(results) == 2
-    assert results[0]['content'] == "hello"
+    assert results[0]['content'][0]['text'] == "hello"
 
     # Verify the provider received the stripped model name
     assert len(provider.stream_calls) == 1

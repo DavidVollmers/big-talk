@@ -1,7 +1,7 @@
 import asyncio
 from typing import AsyncGenerator, Sequence
 from big_talk.llm import LLMProvider
-from big_talk import Message, AssistantMessage
+from big_talk import Message, AssistantMessage, Text
 from big_talk.streaming import StreamContext, StreamHandler
 
 
@@ -28,7 +28,11 @@ class TestLLMProvider(LLMProvider):
             raise RuntimeError(f"Simulated failure in {self.name}")
 
         for content in self.responses:
-            yield AssistantMessage(role="assistant", content=content)
+            yield AssistantMessage(role="assistant",
+                                   content=[Text(type="text", text=content)],
+                                   id="test-id",
+                                   parent_id="parent-id",
+                                   is_aggregate=True)
             await asyncio.sleep(0.001)
 
     async def close(self):
