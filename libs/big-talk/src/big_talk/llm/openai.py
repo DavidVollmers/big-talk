@@ -31,7 +31,7 @@ class OpenAIProvider(LLMProvider):
     async def close(self):
         await self._client.close()
 
-    async def stream(self, model: str, messages: Sequence[Message], **kwargs) -> AsyncGenerator[Message, None]:
+    async def stream(self, model: str, messages: Sequence[Message], **kwargs) -> AsyncGenerator[AssistantMessage, None]:
         converted, last_user_message_id = self._convert_messages(messages)
 
         text_buffer: list[str] = []

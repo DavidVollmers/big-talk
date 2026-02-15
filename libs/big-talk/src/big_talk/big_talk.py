@@ -1,11 +1,13 @@
 import asyncio
 from typing import Sequence, Any, AsyncGenerator, Callable
 
+from . import ToolUse, SystemMessage
 from .middleware import MiddlewareStack
 from .streaming import StreamContext, StreamingMiddlewareStack, BaseStreamHandler
 from .tool import Tool
 from .llm import LLMProvider, LLMProviderFactory
-from .message import Message
+from .message import Message, AssistantMessage
+from .tool_execution import ToolExecutionMiddlewareStack, BaseToolExecutionHandler, ToolExecutionContext
 
 
 class BigTalk:
@@ -16,10 +18,15 @@ class BigTalk:
             'openai': self._openai_provider_factory,
         }
         self._streaming: StreamingMiddlewareStack = MiddlewareStack(BaseStreamHandler())
+        self._tool_execution: ToolExecutionMiddlewareStack = MiddlewareStack(BaseToolExecutionHandler())
 
     @property
     def streaming(self) -> StreamingMiddlewareStack:
         return self._streaming
+
+    @property
+    def tool_execution(self) -> ToolExecutionMiddlewareStack:
+        return self._tool_execution
 
     def add_provider(self, name: str, provider_factory: LLMProviderFactory, override: bool = False) -> None:
         if not override and (name in self._providers or name in self._provider_factories):
@@ -49,22 +56,52 @@ class BigTalk:
         provider, model_name = self._parse_model(model)
         return self._get_provider(provider), model_name
 
-    async def stream(self, model: str, messages: Sequence[Message], tools: Sequence[Callable | Tool] = None,
-                     **kwargs: Any) -> AsyncGenerator[Message, None]:
+    async def stream(self,
+                     model: str,
+                     messages: Sequence[Message],
+                     tools: Sequence[Callable | Tool] = None,
+                     max_iterations: int = 10,
+                     **kwargs: Any) -> AsyncGenerator[AssistantMessage, None]:
         if not any(message['role'] == 'user' for message in messages):
             raise ValueError('At least one user message is required to generate a response.')
 
         normalized_tools = self._normalize_tools(tools)
 
-        # current_history = list(messages)
+        current_history = list(messages)
 
         stream_handler = self._streaming.build()
+        tool_execution_handler = self._tool_execution.build()
 
-        ctx = StreamContext(model=model, tools=normalized_tools, messages=messages,
-                            _provider_resolver=self._get_llm_provider)
-        async for message in stream_handler(ctx, **kwargs):
-            # TODO handle tool calls and results
-            yield message
+        for iteration in range(max_iterations):
+            stream_ctx = StreamContext(model=model, tools=normalized_tools, messages=messages,
+                                       _provider_resolver=self._get_llm_provider)
+
+            tool_uses: list[ToolUse] = []
+            async for message in stream_handler(stream_ctx, **kwargs):
+                yield message
+
+                if not message['is_aggregate']:
+                    break
+
+                current_history.append(message)
+
+                tool_uses.extend([b for b in message['content'] if b['type'] == 'tool_use'])
+
+            if not tool_uses:
+                break
+
+            tool_execution_ctx = ToolExecutionContext(
+                tool_uses=tool_uses,
+                tools=normalized_tools,
+                messages=current_history
+            )
+
+            tool_results = [r async for r in tool_execution_handler(tool_execution_ctx)]
+
+            current_history.append(SystemMessage(
+                role='system',
+                content=tool_results
+            ))
 
     async def close(self):
         results = await asyncio.gather(*(provider.close() for provider in self._providers.values()),
@@ -72,12 +109,6 @@ class BigTalk:
         exceptions = [result for result in results if isinstance(result, Exception)]
         if exceptions:
             raise ExceptionGroup('One or more providers failed to close', exceptions)
-
-    @staticmethod
-    async def _llm_stream(ctx: StreamContext, **kwargs: Any) -> AsyncGenerator[Message, None]:
-        provider, model_name = ctx.get_llm_provider()
-        async for message in provider.stream(model=model_name, messages=ctx.messages, **kwargs):
-            yield message
 
     @staticmethod
     def _normalize_tools(tools: Sequence[Callable | Tool] | None) -> list[Tool]:

@@ -16,7 +16,7 @@ class TestLLMProvider(LLMProvider):
     async def count_tokens(self, model: str, messages: Sequence[Message], **kwargs) -> int:
         return len(self.responses)
 
-    async def stream(self, model: str, messages: Sequence[Message], **kwargs) -> AsyncGenerator[Message, None]:
+    async def stream(self, model: str, messages: Sequence[Message], **kwargs) -> AsyncGenerator[AssistantMessage, None]:
         # Store calls for verification
         self.stream_calls.append({
             "model": model,
@@ -42,7 +42,8 @@ class SpyMiddleware:
         self.mutate_model_to = mutate_model_to
         self.call_log = []
 
-    async def __call__(self, handler: StreamHandler, ctx: StreamContext, **kwargs) -> AsyncGenerator[Message, None]:
+    async def __call__(self, handler: StreamHandler, ctx: StreamContext, **kwargs) \
+            -> AsyncGenerator[AssistantMessage, None]:
         self.call_log.append("enter")
 
         # Scenario: Mutating the context

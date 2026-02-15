@@ -27,7 +27,7 @@ class AnthropicProvider(LLMProvider):
         result = await self._client.messages.count_tokens(model=model, system=system, messages=converted, **kwargs)
         return result.input_tokens
 
-    async def stream(self, model: str, messages: Sequence[Message], **kwargs) -> AsyncGenerator[Message, None]:
+    async def stream(self, model: str, messages: Sequence[Message], **kwargs) -> AsyncGenerator[AssistantMessage, None]:
         system, converted, last_user_message_id = self._convert_messages(messages)
         async with self._client.messages.stream(model=model, system=system, messages=converted, **kwargs) as stream:
             message_id = str(uuid4())
