@@ -97,3 +97,125 @@ async def test_parallel_execution_speed(bigtalk, simple_message):
     duration = time.time() - start
 
     assert duration < 0.18  # Parallel (0.1s) vs Serial (0.2s)
+
+
+@pytest.mark.asyncio
+async def test_tool_error_handling(bigtalk, simple_message):
+    """
+    Verify that if one tool fails, others still run, and the error
+    is reported in the SystemMessage.
+    """
+
+    # 1. Define Tools
+    async def success_tool():
+        return "Success"
+
+    async def fail_tool():
+        raise ValueError("Boom!")
+
+    # 2. Mock LLM Response: Call both
+    tool_msg = AssistantMessage(
+        role="assistant",
+        content=[
+            ToolUse(type="tool_use", id="1", name="success_tool", params={}),
+            ToolUse(type="tool_use", id="2", name="fail_tool", params={})
+        ],
+        id="resp_1", parent_id="p_1", is_aggregate=True
+    )
+
+    bigtalk.add_provider("test", lambda: MockToolProvider([tool_msg]))
+
+    # 3. Execution
+    history = [simple_message]
+
+    async for msg in bigtalk.stream("test/model", history, tools=[success_tool, fail_tool]):
+        if msg['role'] == 'system':
+            history.append(msg)
+
+    # 4. Verification
+    # Get the system message with results
+    system_msg = history[-1]
+    assert system_msg['role'] == 'system'
+    results = system_msg['content']
+
+    # Find results by ID
+    res_success = next(r for r in results if r['tool_use_id'] == '1')
+    res_fail = next(r for r in results if r['tool_use_id'] == '2')
+
+    # Success Check
+    assert res_success['is_error'] is False
+    assert res_success['result'] == "Success"
+
+    # Failure Check
+    assert res_fail['is_error'] is True
+    assert "Boom!" in res_fail['result']
+
+
+@pytest.mark.asyncio
+async def test_tool_middleware_interception(bigtalk, simple_message):
+    """
+    Verify middleware can intercept the execution pipeline and modify results.
+    """
+
+    async def echo_tool(val: str):
+        return val
+
+    # 1. Register Middleware
+    @bigtalk.tool_execution.use
+    async def interception_middleware(handler, ctx, **kwargs):
+        # A. Inspect: We can see what tools are being called
+        assert ctx.tool_uses[0]['name'] == 'echo_tool'
+
+        # B. Get Pending Tasks
+        tasks = await handler(ctx, **kwargs)
+
+        # C. Modify: Wrap the task to append text to the result
+        async def wrapper(coro):
+            res = await coro
+            res['result'] = f"Intercepted: {res['result']}"
+            return res
+
+        return [wrapper(t) for t in tasks]
+
+    # 2. Mock LLM
+    tool_msg = AssistantMessage(
+        role="assistant",
+        content=[ToolUse(type="tool_use", id="1", name="echo_tool", params={"val": "Hello"})],
+        id="resp_1", parent_id="p_1", is_aggregate=True
+    )
+    bigtalk.add_provider("test", lambda: MockToolProvider([tool_msg]))
+
+    # 3. Execution
+    history = [simple_message]
+    async for msg in bigtalk.stream("test/model", history, tools=[echo_tool]):
+        if msg['role'] == 'system':
+            history.append(msg)
+
+    # 4. Verify Result
+    result_str = history[-1]['content'][0]['result']
+    assert result_str == "Intercepted: Hello"
+
+
+@pytest.mark.asyncio
+async def test_tool_not_found(bigtalk, simple_message):
+    """Verify behavior when LLM calls a non-existent tool."""
+
+    # Mock LLM calls 'ghost_tool'
+    tool_msg = AssistantMessage(
+        role="assistant",
+        content=[ToolUse(type="tool_use", id="1", name="ghost_tool", params={})],
+        id="resp_1", parent_id="p_1", is_aggregate=True
+    )
+
+    bigtalk.add_provider("test", lambda: MockToolProvider([tool_msg]))
+
+    history = [simple_message]
+    # We pass NO tools
+    async for msg in bigtalk.stream("test/model", history, tools=[]):
+        if msg['role'] == 'system':
+            history.append(msg)
+
+    result = history[-1]['content'][0]
+
+    assert result['is_error'] is True
+    assert "not found" in result['result']
