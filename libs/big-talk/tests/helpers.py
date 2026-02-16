@@ -5,6 +5,20 @@ from big_talk import Message, AssistantMessage, Text
 from big_talk.streaming import StreamContext, StreamHandler
 
 
+class MockToolProvider(LLMProvider):
+    def __init__(self, responses: list[AssistantMessage]):
+        self.responses = responses
+
+    async def count_tokens(self, model: str, messages: Sequence[Message], **kwargs) -> int:
+        pass
+
+    async def stream(self, model: str, messages: Sequence[Message], **kwargs) -> AsyncGenerator[AssistantMessage, None]:
+        if self.responses:
+            yield self.responses.pop(0)
+
+    async def close(self): pass
+
+
 class TestLLMProvider(LLMProvider):
     def __init__(self, name: str, responses: list[str] = None, fail_on_stream: bool = False):
         self.name = name

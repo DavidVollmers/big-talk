@@ -5,7 +5,7 @@ from .middleware import MiddlewareStack
 from .streaming import StreamContext, StreamingMiddlewareStack, BaseStreamHandler
 from .tool import Tool
 from .llm import LLMProvider, LLMProviderFactory
-from .message import Message, AssistantMessage, SystemMessage, ToolUse
+from .message import Message, SystemMessage, ToolUse
 from .tool_execution import ToolExecutionMiddlewareStack, BaseToolExecutionHandler, ToolExecutionContext
 
 
@@ -60,7 +60,7 @@ class BigTalk:
                      messages: Sequence[Message],
                      tools: Sequence[Callable | Tool] = None,
                      max_iterations: int = 10,
-                     **kwargs: Any) -> AsyncGenerator[AssistantMessage, None]:
+                     **kwargs: Any) -> AsyncGenerator[Message, None]:
         if not any(message['role'] == 'user' for message in messages):
             raise ValueError('At least one user message is required to generate a response.')
 
@@ -97,11 +97,13 @@ class BigTalk:
 
             tool_tasks = await tool_execution_handler(tool_execution_ctx)
             tool_results = await asyncio.gather(*tool_tasks)
-
-            current_history.append(SystemMessage(
+            tool_result_message = SystemMessage(
                 role='system',
                 content=tool_results
-            ))
+            )
+
+            yield tool_result_message
+            current_history.append(tool_result_message)
 
     async def close(self):
         results = await asyncio.gather(*(provider.close() for provider in self._providers.values()),
