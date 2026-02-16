@@ -1,8 +1,20 @@
 [project]
 name = "big-talk-ai"
-version = "0.0.0"
-description = "Biggest talk in town"
+version = "0.1.0"
+description = "The lightweight, middleware-first LLM framework for Python."
 requires-python = ">=3.12"
+readme = "README.md"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Operating System :: OS Independent",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+keywords = ["llm", "middleware", "framework", "ai", "language-models", "chatbots", "conversational-ai"]
 dependencies = [
     "docstring-parser>=0.17.0",
 ]
@@ -10,3 +22,10 @@ dependencies = [
 [project.optional-dependencies]
 anthropic = ["anthropic>=0.79.0"]
 openai = ["openai>=2.21.0", "tiktoken>=0.12.0"]
+
+[project.urls]
+Homepage = "https://github.com/DavidVollmers/big-talk"
+Documentation = "https://github.com/DavidVollmers/big-talk/blob/main/README.md"
+Repository = "https://github.com/DavidVollmers/big-talk.git"
+Issues = "https://github.com/DavidVollmers/big-talk/issues"
+Changelog = "https://github.com/DavidVollmers/big-talk/blob/main/CHANGELOG.md"
