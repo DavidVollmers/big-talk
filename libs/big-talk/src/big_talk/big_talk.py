@@ -5,7 +5,7 @@ from .middleware import MiddlewareStack
 from .streaming import StreamContext, StreamingMiddlewareStack, BaseStreamHandler
 from .tool import Tool
 from .llm import LLMProvider, LLMProviderFactory
-from .message import Message, SystemMessage, ToolUse
+from .message import Message, SystemMessage, ToolUse, ToolMessage
 from .tool_execution import ToolExecutionMiddlewareStack, BaseToolExecutionHandler, ToolExecutionContext
 
 
@@ -97,8 +97,8 @@ class BigTalk:
 
             tool_tasks = await tool_execution_handler(tool_execution_ctx)
             tool_results = await asyncio.gather(*tool_tasks)
-            tool_result_message = SystemMessage(
-                role='system',
+            tool_result_message = ToolMessage(
+                role='tool',
                 content=tool_results
             )
 

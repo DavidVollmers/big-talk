@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import MagicMock, patch
 
-from big_talk import SystemMessage, UserMessage
+from big_talk import SystemMessage, UserMessage, ToolMessage
 from big_talk.llm.anthropic import AnthropicProvider
 from big_talk.message import Message, ToolResult
 
@@ -38,7 +38,7 @@ def anthropic_provider():
 async def test_anthropic_message_conversion(anthropic_provider):
     """Test that System Tool Results are moved to User role."""
     messages = [
-        SystemMessage(role="system", content=[
+        ToolMessage(role="tool", content=[
             ToolResult(type="tool_result", tool_use_id="123", result="Success", is_error=False)
         ]),
         UserMessage(role="user", content="Hello", id="u1")

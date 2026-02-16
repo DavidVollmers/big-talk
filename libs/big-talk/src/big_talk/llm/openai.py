@@ -148,21 +148,19 @@ class OpenAIProvider(LLMProvider):
             content = message['content']
 
             if role == 'system':
-                if isinstance(content, str):
-                    converted.append(ChatCompletionSystemMessageParam(
-                        role='system',
-                        content=content
+                converted.append(ChatCompletionSystemMessageParam(
+                    role='system',
+                    content=content
+                ))
+
+            elif role == 'tool':
+                last_user_message_id = message['id']
+                for block in content:
+                    converted.append(ChatCompletionToolMessageParam(
+                        role='tool',
+                        tool_call_id=block['tool_use_id'],
+                        content=block['result'],
                     ))
-                else:
-                    last_user_message_id = message['id']
-                    for block in content:
-                        if block['type'] != 'tool_result':
-                            raise ValueError(f'Expected tool result block, got: {block}')
-                        converted.append(ChatCompletionToolMessageParam(
-                            role='tool',
-                            tool_call_id=block['tool_use_id'],
-                            content=block['result'],
-                        ))
 
             elif role == 'user':
                 converted.append(ChatCompletionUserMessageParam(

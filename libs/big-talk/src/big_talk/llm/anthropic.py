@@ -67,13 +67,15 @@ class AnthropicProvider(LLMProvider):
             role = message['role']
             content = message['content']
             if role == 'system':
-                if isinstance(content, str):
-                    system_parts.append(content)
-                else:
-                    converted.append(MessageParam(
-                        role='user',
-                        content=[AnthropicProvider._convert_tool_result(block) for block in content]
-                    ))
+                system_parts.append(content)
+            elif role == 'tool':
+                converted.append(MessageParam(
+                    role='user',
+                    content=[ToolResultBlockParam(type='tool_result',
+                                                  tool_use_id=block['tool_use_id'],
+                                                  content=block['result'],
+                                                  is_error=block['is_error']) for block in content]
+                ))
             elif role == 'user':
                 last_user_message_id = message['id']
                 converted.append(MessageParam(
@@ -88,15 +90,6 @@ class AnthropicProvider(LLMProvider):
 
         system = '\n'.join(system_parts) if system_parts else omit
         return system, converted, last_user_message_id
-
-    @staticmethod
-    def _convert_tool_result(block: ToolResult) -> ToolResultBlockParam:
-        match block:
-            case {'type': 'tool_result', 'tool_use_id': tool_use_id, 'result': result, 'is_error': is_error}:
-                return ToolResultBlockParam(type='tool_result', tool_use_id=tool_use_id, content=result,
-                                            is_error=is_error)
-            case _:
-                raise ValueError(f'Expected tool result block, got: {block}')
 
     @staticmethod
     def _convert_block(block: AssistantContentBlock) -> Union[TextBlockParam, ThinkingBlockParam, ToolUseBlockParam]:

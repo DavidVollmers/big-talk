@@ -42,7 +42,7 @@ async def test_tool_execution_persistence(bigtalk, simple_message):
     async for msg in bigtalk.stream("test/model", history, tools=[my_tool]):
         # We only append AGGREGATE messages to our history
         # (BigTalk yields deltas too, but our mock yields full messages)
-        if msg.get('is_aggregate') or msg['role'] == 'system':
+        if msg.get('is_aggregate') or msg['role'] == 'tool':
             history.append(msg)
 
     # 4. Assertions on the UPDATED history
@@ -56,7 +56,7 @@ async def test_tool_execution_persistence(bigtalk, simple_message):
     assert history[1]['content'][0]['type'] == 'tool_use'
 
     # Index 2: System (Tool Result) - THIS was missing before!
-    assert history[2]['role'] == 'system'
+    assert history[2]['role'] == 'tool'
     assert history[2]['content'][0]['result'] == "Tool Output"
 
     # Index 3: Assistant (Final Reply)
@@ -129,13 +129,13 @@ async def test_tool_error_handling(bigtalk, simple_message):
     history = [simple_message]
 
     async for msg in bigtalk.stream("test/model", history, tools=[success_tool, fail_tool]):
-        if msg['role'] == 'system':
+        if msg['role'] == 'tool':
             history.append(msg)
 
     # 4. Verification
     # Get the system message with results
     system_msg = history[-1]
-    assert system_msg['role'] == 'system'
+    assert system_msg['role'] == 'tool'
     results = system_msg['content']
 
     # Find results by ID
@@ -188,7 +188,7 @@ async def test_tool_middleware_interception(bigtalk, simple_message):
     # 3. Execution
     history = [simple_message]
     async for msg in bigtalk.stream("test/model", history, tools=[echo_tool]):
-        if msg['role'] == 'system':
+        if msg['role'] == 'tool':
             history.append(msg)
 
     # 4. Verify Result
@@ -212,7 +212,7 @@ async def test_tool_not_found(bigtalk, simple_message):
     history = [simple_message]
     # We pass NO tools
     async for msg in bigtalk.stream("test/model", history, tools=[]):
-        if msg['role'] == 'system':
+        if msg['role'] == 'tool':
             history.append(msg)
 
     result = history[-1]['content'][0]
