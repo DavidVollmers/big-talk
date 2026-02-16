@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import MagicMock, AsyncMock
-from big_talk import BigTalk, Tool
+from big_talk import BigTalk, Tool, tool
 
 
 @pytest.mark.asyncio
@@ -33,3 +33,28 @@ async def test_stream_normalizes_tools(simple_message):
     assert len(passed_tools) == 1
     assert isinstance(passed_tools[0], Tool)
     assert passed_tools[0].name == "my_raw_func"
+
+
+def test_tool_decorator_styles():
+    # Style 1: Bare decorator
+    @tool
+    def simple_tool(x: int): return x
+
+    assert isinstance(simple_tool, Tool)
+    assert simple_tool.name == "simple_tool"
+    assert simple_tool.metadata == {}
+
+    # Style 2: Configured decorator
+    @tool(metadata={"scope": "admin"})
+    def admin_tool(x: int): return x
+
+    assert isinstance(admin_tool, Tool)
+    assert admin_tool.metadata == {"scope": "admin"}
+
+    # Style 3: Manual call (factory style)
+    def manual_func(): pass
+
+    manual_tool = tool(metadata={"type": "manual"})(manual_func)
+
+    assert isinstance(manual_tool, Tool)
+    assert manual_tool.metadata == {"type": "manual"}

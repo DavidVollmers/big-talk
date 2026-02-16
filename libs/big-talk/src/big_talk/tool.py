@@ -1,7 +1,7 @@
 import inspect
 from dataclasses import dataclass
 from typing import Any, Callable, get_type_hints, get_origin, Literal, get_args, TypedDict, Sequence, Union, TypeAlias, \
-    Optional, is_typeddict, Annotated
+    Optional, is_typeddict, Annotated, overload
 
 import docstring_parser
 
@@ -182,6 +182,29 @@ class Tool:
         raise NotImplementedError(f'Type {t} is not supported in Tool parameter type mapping.')
 
 
-def tool(func: Callable, metadata: dict[str, Any] = None) -> Tool:
-    """Decorator to convert a function into a BigTalk Tool."""
-    return Tool.from_func(func, metadata)
+@overload
+def tool(func: Callable) -> Tool: ...
+
+
+@overload
+def tool(*, metadata: dict[str, Any] = None) -> Callable[[Callable], Tool]: ...
+
+
+def tool(func: Callable = None, *, metadata: dict[str, Any] = None) -> Tool | Callable[[Callable], Tool]:
+    """
+    Decorator to convert a function into a BigTalk Tool.
+
+    Supports both:
+      @tool
+      def my_func(): ...
+
+      @tool(metadata={'scope': 'read'})
+      def my_func(): ...
+    """
+    if func is None:
+        def wrapper(f: Callable) -> Tool:
+            return Tool.from_func(f, metadata=metadata)
+
+        return wrapper
+
+    return Tool.from_func(func, metadata=metadata)
