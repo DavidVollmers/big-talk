@@ -49,7 +49,7 @@ class AnthropicProvider(LLMProvider):
                                                signature=chunk.content_block.signature)
                 elif chunk.content_block.type == 'tool_use':
                     block = ToolUse(type='tool_use', id=chunk.content_block.id, name=chunk.content_block.name,
-                                    params=chunk.content_block.input)
+                                    params=chunk.content_block.input, metadata=None)
                 else:
                     # TODO redacted thinking
                     continue

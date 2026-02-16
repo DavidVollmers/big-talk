@@ -48,9 +48,13 @@ class Tool:
     description: str
     parameters: ToolParameters
     func: Callable
+    metadata: dict[str, Any]
 
     @classmethod
-    def from_func(cls, func: Callable) -> 'Tool':
+    def from_func(cls, func: Callable, metadata: dict[str, Any] = None) -> 'Tool':
+        if not metadata:
+            metadata = {}
+
         doc = docstring_parser.parse(inspect.getdoc(func) or '')
 
         description = doc.short_description or ''
@@ -94,19 +98,30 @@ class Tool:
             required=required
         )
 
-        return cls(name=func.__name__, description=description, parameters=parameters, func=func)
+        return cls(name=func.__name__, description=description, parameters=parameters, func=func, metadata=metadata)
 
     @staticmethod
     def _schema_from_type(t: type) -> ToolParametersProperty:
+        origin = get_origin(t)
+
         # Handle Annotated
         description = None
-        if get_origin(t) is Annotated:
+        if origin is Annotated:
             args = get_args(t)
             t = args[0]
             for arg in args[1:]:
                 if isinstance(arg, str):
                     description = arg
                     break
+
+        # Handle Optional (e.g. Optional[str] or Union[str, None])
+        if origin is Union:
+            args = get_args(t)
+            non_none_args = [a for a in args if a is not type(None)]
+            if len(non_none_args) == 1:
+                return Tool._schema_from_type(non_none_args[0])
+            else:
+                return Tool._schema_from_type(non_none_args[0])
 
         # Pydantic support
         if hasattr(t, 'model_json_schema') and callable(t.model_json_schema):
@@ -167,6 +182,6 @@ class Tool:
         raise NotImplementedError(f'Type {t} is not supported in Tool parameter type mapping.')
 
 
-def tool(func: Callable) -> Tool:
+def tool(func: Callable, metadata: dict[str, Any] = None) -> Tool:
     """Decorator to convert a function into a BigTalk Tool."""
-    return Tool.from_func(func)
+    return Tool.from_func(func, metadata)

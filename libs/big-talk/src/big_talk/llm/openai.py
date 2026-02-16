@@ -135,7 +135,8 @@ class OpenAIProvider(LLMProvider):
             type='tool_use',
             id=tool_id,
             name=tool_name,
-            params=json.loads(''.join(arg_parts))
+            params=json.loads(''.join(arg_parts)),
+            metadata=None
         )
 
     @staticmethod

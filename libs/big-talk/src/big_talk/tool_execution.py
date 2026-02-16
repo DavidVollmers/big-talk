@@ -33,6 +33,10 @@ class BaseToolExecutionHandler(ToolExecutionHandler):
                 continue
 
             tool = tool_map[tool_use['name']]
+            tool_use['metadata'] = {
+                **tool.metadata,
+                **tool_use.get('metadata', {})
+            }
             tasks.append(self._execute_tool(tool, tool_use))
 
         return tasks

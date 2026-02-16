@@ -6,6 +6,7 @@ class ToolUse(TypedDict):
     id: str
     name: str
     params: dict[str, Any]
+    metadata: dict[str, Any]
 
 
 class ToolResult(TypedDict):

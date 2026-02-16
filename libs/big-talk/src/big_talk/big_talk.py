@@ -115,7 +115,8 @@ class BigTalk:
                     id=str(uuid4()),
                     role='tool',
                     content=results,
-                    parent_id=parent_id
+                    parent_id=parent_id,
+                    metadata=None
                 )
 
                 yield tool_result_message
