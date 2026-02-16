@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from typing import Sequence, TypeAlias, Iterable, Awaitable
 
 from .message import ToolUse, Message, ToolResult
-from .middleware import MiddlewareStack, MiddlewareHandler
+from .middleware import MiddlewareStack, MiddlewareHandler, Middleware
 from .tool import Tool
 
 
@@ -15,6 +15,8 @@ class ToolExecutionContext:
 
 
 ToolExecutionHandler: TypeAlias = MiddlewareHandler[ToolExecutionContext, Awaitable[Iterable[Awaitable[ToolResult]]]]
+
+ToolExecutionMiddleware: TypeAlias = Middleware[ToolExecutionContext, Awaitable[Iterable[Awaitable[ToolResult]]]]
 
 ToolExecutionMiddlewareStack: TypeAlias = MiddlewareStack[
     ToolExecutionContext, Awaitable[Iterable[Awaitable[ToolResult]]]]

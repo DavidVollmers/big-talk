@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Callable, Sequence, TypeAlias, AsyncGenerator, Any
 
-from .middleware import MiddlewareStack, MiddlewareHandler
+from .middleware import MiddlewareStack, MiddlewareHandler, Middleware
 from .tool import Tool
 from .llm import LLMProvider
 from .message import Message, AssistantMessage
@@ -19,6 +19,8 @@ class StreamContext:
 
 
 StreamHandler: TypeAlias = MiddlewareHandler[StreamContext, AsyncGenerator[AssistantMessage, None]]
+
+StreamingMiddleware: TypeAlias = Middleware[StreamContext, AsyncGenerator[AssistantMessage, None]]
 
 StreamingMiddlewareStack: TypeAlias = MiddlewareStack[StreamContext, AsyncGenerator[AssistantMessage, None]]
 
