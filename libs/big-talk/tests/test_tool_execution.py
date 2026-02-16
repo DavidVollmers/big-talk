@@ -219,3 +219,95 @@ async def test_tool_not_found(bigtalk, simple_message):
 
     assert result['is_error'] is True
     assert "not found" in result['result']
+
+
+@pytest.mark.asyncio
+async def test_tool_result_parent_linking(bigtalk, simple_message):
+    """
+    Verify that the ToolMessage containing the results points back
+    to the AssistantMessage that requested the tool via parent_id.
+    """
+
+    async def my_tool():
+        return "done"
+
+    # Setup: Assistant Message with specific ID
+    target_parent_id = "assist_123"
+
+    tool_msg = AssistantMessage(
+        role="assistant",
+        content=[ToolUse(type="tool_use", id="call_1", name="my_tool", params={})],
+        id=target_parent_id,  # <--- The ID we expect to see in the result
+        parent_id="p_1",
+        is_aggregate=True
+    )
+
+    bigtalk.add_provider("test", lambda: MockToolProvider([tool_msg]))
+
+    history = [simple_message]
+
+    async for msg in bigtalk.stream("test/model", history, tools=[my_tool]):
+        if msg['role'] == 'tool':
+            history.append(msg)
+
+    # Check the ToolMessage
+    tool_result_msg = history[-1]
+    assert tool_result_msg['role'] == 'tool'
+
+    # The Critical Assertion
+    assert tool_result_msg['parent_id'] == target_parent_id
+
+
+@pytest.mark.asyncio
+async def test_batch_tool_execution_grouping(bigtalk, simple_message):
+    """
+    Verify that if the stream yields multiple assistant messages with tool calls,
+    BigTalk executes them all in parallel but groups the results into
+    separate ToolMessages keyed by their specific parent_id.
+    """
+
+    async def tool_1():
+        return "1"
+
+    async def tool_2():
+        return "2"
+
+    # Message 1 calls tool_1
+    msg_1 = AssistantMessage(
+        role="assistant",
+        content=[ToolUse(type="tool_use", id="c1", name="tool_1", params={})],
+        id="parent_A",
+        parent_id="p",
+        is_aggregate=True
+    )
+
+    # Message 2 calls tool_2 (simulating a provider yielding multiple thoughts/steps)
+    msg_2 = AssistantMessage(
+        role="assistant",
+        content=[ToolUse(type="tool_use", id="c2", name="tool_2", params={})],
+        id="parent_B",
+        parent_id="p",
+        is_aggregate=True
+    )
+
+    # Provider yields both in one go
+    bigtalk.add_provider("test", lambda: MockToolProvider([msg_1, msg_2]))
+
+    tool_messages = []
+
+    async for msg in bigtalk.stream("test/model", [simple_message], tools=[tool_1, tool_2]):
+        if msg['role'] == 'tool':
+            tool_messages.append(msg)
+
+    # Should have 2 separate tool result messages (one for A, one for B)
+    assert len(tool_messages) == 2
+
+    # Find results by parent_id
+    res_A = next((m for m in tool_messages if m['parent_id'] == 'parent_A'), None)
+    res_B = next((m for m in tool_messages if m['parent_id'] == 'parent_B'), None)
+
+    assert res_A is not None, "Missing result for parent_A"
+    assert res_B is not None, "Missing result for parent_B"
+
+    assert res_A['content'][0]['result'] == "1"
+    assert res_B['content'][0]['result'] == "2"
