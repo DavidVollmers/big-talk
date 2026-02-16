@@ -1,6 +1,6 @@
 [project]
 name = "big-talk-ai"
-version = "0.2.0"
+version = "0.2.1"
 description = "The lightweight, middleware-first LLM framework for Python."
 requires-python = ">=3.12"
 readme = "README.md"

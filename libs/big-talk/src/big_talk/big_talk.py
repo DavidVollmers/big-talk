@@ -1,5 +1,6 @@
 import asyncio
 from typing import Sequence, Any, AsyncGenerator, Callable
+from uuid import uuid4
 
 from .middleware import MiddlewareStack
 from .streaming import StreamContext, StreamingMiddlewareStack, BaseStreamHandler
@@ -98,6 +99,7 @@ class BigTalk:
             tool_tasks = await tool_execution_handler(tool_execution_ctx)
             tool_results = await asyncio.gather(*tool_tasks)
             tool_result_message = ToolMessage(
+                id=str(uuid4()),
                 role='tool',
                 content=tool_results
             )
