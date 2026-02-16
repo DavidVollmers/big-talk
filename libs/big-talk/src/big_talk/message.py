@@ -44,6 +44,12 @@ class ToolMessage(TypedDict):
     content: Sequence[ToolResult]
 
 
+class AppMessage(TypedDict):
+    role: Literal['app']
+    type: str
+    content: Any
+
+
 AssistantContentBlock: TypeAlias = Union[Text, Thinking, ToolUse]
 
 
@@ -55,4 +61,4 @@ class AssistantMessage(TypedDict):
     is_aggregate: bool
 
 
-Message: TypeAlias = Union[UserMessage, SystemMessage, AssistantMessage, ToolMessage]
+Message: TypeAlias = Union[UserMessage, SystemMessage, AssistantMessage, ToolMessage, AppMessage]
