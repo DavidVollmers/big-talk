@@ -1,4 +1,4 @@
-from typing import TypedDict, Literal, Any, Union, TypeAlias, Sequence
+from typing import TypedDict, Literal, Any, Union, TypeAlias, Sequence, Optional
 
 
 class ToolUse(TypedDict):
@@ -39,12 +39,14 @@ class SystemMessage(TypedDict):
 
 class ToolMessage(TypedDict):
     id: str
+    parent_id: str
     role: Literal['tool']
     content: Sequence[ToolResult]
 
 
 class AppMessage(TypedDict):
     id: str
+    parent_id: Optional[str]
     role: Literal['app']
     type: str
     content: Any

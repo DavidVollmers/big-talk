@@ -1,4 +1,5 @@
 import asyncio
+from collections import defaultdict
 from typing import Sequence, Any, AsyncGenerator, Callable
 from uuid import uuid4
 
@@ -76,7 +77,7 @@ class BigTalk:
             stream_ctx = StreamContext(model=model, tools=normalized_tools, messages=current_history,
                                        _provider_resolver=self._get_llm_provider)
 
-            tool_uses: list[ToolUse] = []
+            tool_uses_by_parent: list[tuple[str, ToolUse]] = []
             async for message in stream_handler(stream_ctx, **kwargs):
                 yield message
 
@@ -85,10 +86,16 @@ class BigTalk:
 
                 current_history.append(message)
 
-                tool_uses.extend([b for b in message['content'] if b['type'] == 'tool_use'])
+                parent_id = message['id']
 
-            if not tool_uses:
+                tool_uses = [b for b in message['content'] if b['type'] == 'tool_use']
+                for tool_use in tool_uses:
+                    tool_uses_by_parent.append((parent_id, tool_use))
+
+            if not tool_uses_by_parent:
                 break
+
+            tool_uses = [tu for _, tu in tool_uses_by_parent]
 
             tool_execution_ctx = ToolExecutionContext(
                 tool_uses=tool_uses,
@@ -98,14 +105,21 @@ class BigTalk:
 
             tool_tasks = await tool_execution_handler(tool_execution_ctx)
             tool_results = await asyncio.gather(*tool_tasks)
-            tool_result_message = ToolMessage(
-                id=str(uuid4()),
-                role='tool',
-                content=tool_results
-            )
 
-            yield tool_result_message
-            current_history.append(tool_result_message)
+            results_by_parent = defaultdict(list)
+            for (parent_id, _), result in zip(tool_uses_by_parent, tool_results):
+                results_by_parent[parent_id].append(result)
+
+            for parent_id, results in results_by_parent.items():
+                tool_result_message = ToolMessage(
+                    id=str(uuid4()),
+                    role='tool',
+                    content=results,
+                    parent_id=parent_id
+                )
+
+                yield tool_result_message
+                current_history.append(tool_result_message)
 
     async def close(self):
         results = await asyncio.gather(*(provider.close() for provider in self._providers.values()),

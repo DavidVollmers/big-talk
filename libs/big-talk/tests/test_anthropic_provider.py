@@ -39,7 +39,7 @@ async def test_anthropic_message_conversion(anthropic_provider):
     """Test that System Tool Results are moved to User role."""
     messages = [
         ToolMessage(role="tool", content=[
-            ToolResult(type="tool_result", tool_use_id="123", result="Success", is_error=False)
+            ToolResult(type="tool_result", tool_use_id="123", result="Success", is_error=False, parent_id="u1")
         ]),
         UserMessage(role="user", content="Hello", id="u1")
     ]
