@@ -1,6 +1,6 @@
 import pytest
 
-from big_talk import AssistantMessage, Text
+from big_talk import AssistantMessage, Text, AppMessage
 
 
 @pytest.mark.asyncio
@@ -74,6 +74,25 @@ async def test_middleware_short_circuit(bigtalk, create_provider, simple_message
 
     assert len(results) == 1
     assert results[0]['content'][0]['text'] == "cached_response"
+    assert len(provider.stream_calls) == 0  # LLM never touched
+
+
+@pytest.mark.asyncio
+async def test_middleware_app_message(bigtalk, create_provider, simple_message):
+    """Test middleware returning early (caching) without calling handler."""
+    provider = create_provider()
+    bigtalk.add_provider("test", lambda: provider)
+
+    async def app_middleware(handler, ctx, **kwargs):
+        # Don't call handler, just yield mock response
+        yield AppMessage(role="app", content=[Text(type="text", text="app_response")], id="cached_id", type="test")
+
+    bigtalk.streaming.use(app_middleware)
+
+    results = [m async for m in bigtalk.stream("test/m", [simple_message])]
+
+    assert len(results) == 1
+    assert results[0]['content'][0]['text'] == "app_response"
     assert len(provider.stream_calls) == 0  # LLM never touched
 
 

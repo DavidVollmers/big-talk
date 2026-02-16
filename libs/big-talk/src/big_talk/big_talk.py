@@ -80,7 +80,7 @@ class BigTalk:
             async for message in stream_handler(stream_ctx, **kwargs):
                 yield message
 
-                if not message['is_aggregate']:
+                if not message.get('is_aggregate', True):
                     continue
 
                 current_history.append(message)

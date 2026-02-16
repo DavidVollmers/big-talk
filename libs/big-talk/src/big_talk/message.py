@@ -61,4 +61,8 @@ class AssistantMessage(TypedDict):
     is_aggregate: bool
 
 
-Message: TypeAlias = Union[UserMessage, SystemMessage, AssistantMessage, ToolMessage, AppMessage]
+InputMessage: TypeAlias = Union[UserMessage, SystemMessage, ToolMessage]
+
+OutputMessage: TypeAlias = Union[AssistantMessage, AppMessage]
+
+Message: TypeAlias = Union[InputMessage, OutputMessage]
