@@ -1,6 +1,6 @@
 import pytest
 
-from big_talk import AssistantMessage, Text, AppMessage
+from big_talk import AssistantMessage, Text, AppMessage, ToolUse
 
 
 @pytest.mark.asyncio
@@ -134,3 +134,107 @@ async def test_middleware_can_resolve_provider_manually(bigtalk, create_provider
         pass
 
     assert resolved_provider is provider
+
+
+@pytest.mark.asyncio
+async def test_middleware_history_loading_deduplication(bigtalk, create_provider, simple_message):
+    """
+    Verify that middleware using 'ctx.iteration' only injects history ONCE.
+    This prevents the "Infinite Duplication" bug during tool loops.
+    """
+
+    # 1. Setup Mock "Database" History
+    # Assume we have 2 old messages in the DB
+    db_history = [
+        AssistantMessage(role="assistant", content=[Text(type="text", text="Old Msg 1")], id="old_1",
+                         is_aggregate=True),
+        AssistantMessage(role="assistant", content=[Text(type="text", text="Old Msg 2")], id="old_2", is_aggregate=True)
+    ]
+
+    # 2. Define the "History Middleware" (The Fix)
+    history_loaded_count = 0
+
+    async def history_middleware(handler, ctx, **kwargs):
+        nonlocal history_loaded_count
+
+        # THE FIX: Only load history if iteration is 0
+        if ctx.iteration == 0:
+            history_loaded_count += 1
+            # Prepend DB history to the current input
+            ctx.messages[:] = db_history + ctx.messages
+
+        async for msg in handler(ctx, **kwargs):
+            yield msg
+
+    bigtalk.streaming.use(history_middleware)
+
+    # 3. Setup Provider to Force a Loop (Tool Use)
+    # Turn 1: Returns Tool Call
+    # Turn 2: Returns Final Answer
+    tool_use_msg = AssistantMessage(
+        role="assistant",
+        content=[ToolUse(type="tool_use", id="call_1", name="test_tool", params={})],
+        id="msg_tool",
+        is_aggregate=True
+    )
+    final_msg = AssistantMessage(
+        role="assistant",
+        content=[Text(type="text", text="Final Answer")],
+        id="msg_final",
+        is_aggregate=True
+    )
+
+    mock_provider = create_provider()
+
+    captured_message_lists = []
+
+    async def mock_stream_gen(model, messages, **kwargs):
+        # Store a copy of the message list for inspection
+        captured_message_lists.append(list(messages))
+
+        # Logic to simulate tool conversation
+        current_len = len(messages)
+
+        # Iteration 0: Expecting 3 messages (2 DB + 1 Input)
+        if current_len == 3:
+            yield tool_use_msg
+        # Iteration 1: Expecting 5 messages (2 DB + 1 Input + 1 ToolUse + 1 ToolResult)
+        else:
+            yield final_msg
+
+    mock_provider.stream = mock_stream_gen
+    bigtalk.add_provider("test", lambda: mock_provider)
+
+    # 4. Mock Tool Execution
+    # We need a dummy tool so the loop continues
+    async def test_tool():
+        return "Tool Result Data"
+
+    # 5. Run Stream (Should trigger 2 iterations)
+    # We pass ONLY the new message here
+    results = [m async for m in bigtalk.stream("test/model", [simple_message], tools=[test_tool])]
+
+    # --- ASSERTIONS ---
+
+    # A. Verify History was only loaded ONCE
+    assert history_loaded_count == 1, "Middleware should only load history on iteration 0"
+
+    # B. Verify Result contains the final answer
+    assert results[-1]['content'][0]['text'] == "Final Answer"
+
+    # C. Verify NO Duplication in the Context passed to the Provider
+    assert len(captured_message_lists) == 2, "Provider should have been called exactly twice (Iteration 0 and 1)"
+
+    # Call 1 (Iteration 0): [Old1, Old2, UserInput]
+    assert len(
+        captured_message_lists[0]) == 3, f"Iteration 0 should have 3 messages, got {len(captured_message_lists[0])}"
+    assert captured_message_lists[0][0]['id'] == "old_1"
+
+    # Call 2 (Iteration 1): [Old1, Old2, UserInput, ToolUse, ToolResult]
+    # If middleware duplicated history, this would be 3 + 2 (DB) + 2 (Tools) = 7 or more!
+    assert len(captured_message_lists[
+                   1]) == 5, f"Iteration 1 should have 5 messages, got {len(captured_message_lists[1])}. Duplication detected!"
+
+    # Verify the sequence is clean
+    ids = [m['id'] for m in captured_message_lists[1]]
+    assert ids == ["old_1", "old_2", simple_message['id'], "msg_tool", ids[4]]  # ids[4] is generated tool result ID

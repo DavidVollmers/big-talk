@@ -10,6 +10,7 @@ from .tool import Tool
 
 @dataclass
 class ToolExecutionContext:
+    iteration: int
     tool_uses: Sequence[ToolUse]
     tools: Sequence[Tool]
     messages: Sequence[Message]

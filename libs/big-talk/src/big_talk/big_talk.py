@@ -75,7 +75,7 @@ class BigTalk:
 
         for iteration in range(max_iterations):
             stream_ctx = StreamContext(model=model, tools=normalized_tools, messages=current_history,
-                                       _provider_resolver=self._get_llm_provider)
+                                       _provider_resolver=self._get_llm_provider, iteration=iteration)
 
             tool_uses_by_parent: list[tuple[str, ToolUse]] = []
             async for message in stream_handler(stream_ctx, **kwargs):
@@ -104,7 +104,8 @@ class BigTalk:
             tool_execution_ctx = ToolExecutionContext(
                 tool_uses=tool_uses,
                 tools=normalized_tools,
-                messages=current_history
+                messages=current_history,
+                iteration=iteration
             )
 
             tool_tasks = await tool_execution_handler(tool_execution_ctx)
@@ -140,7 +141,8 @@ class BigTalk:
         context = ToolExecutionContext(
             tool_uses=[tool_use],
             tools=[normalized_tool],
-            messages=messages or []
+            messages=messages or [],
+            iteration=0
         )
 
         handler = self._tool_execution.build()

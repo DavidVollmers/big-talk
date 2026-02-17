@@ -10,6 +10,7 @@ from .message import Message, OutputMessage
 @dataclass
 class StreamContext:
     model: str
+    iteration: int
     tools: Sequence[Tool]
     messages: Sequence[Message]
     _provider_resolver: Callable[[str], tuple[LLMProvider, str]]
