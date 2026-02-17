@@ -58,7 +58,7 @@ async def test_openai_reactive_streaming(openai_provider):
 
     openai_provider._client.chat.completions.create.return_value = mock_stream
 
-    stream = openai_provider.stream("gpt-4", [UserMessage(role="user", content="Hi", id="u1")])
+    stream = openai_provider.stream("gpt-4", [UserMessage(role="user", content="Hi", id="u1")], tools=[])
     results = [msg async for msg in stream]
 
     # Expect:

@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Sequence, AsyncGenerator
 
+from ..tool import Tool
 from ..message import Message, AssistantMessage
 
 
@@ -10,7 +11,8 @@ class LLMProvider(ABC):
         pass
 
     @abstractmethod
-    def stream(self, model: str, messages: Sequence[Message], **kwargs) -> AsyncGenerator[AssistantMessage, None]:
+    def stream(self, model: str, messages: Sequence[Message], tools: Sequence[Tool], **kwargs) \
+            -> AsyncGenerator[AssistantMessage, None]:
         pass
 
     async def close(self):

@@ -69,7 +69,7 @@ async def test_anthropic_streaming(anthropic_provider):
 
     anthropic_provider._client.messages.stream.return_value = MockStream(mock_events)
 
-    stream = anthropic_provider.stream("claude-3", [UserMessage(role="user", content="Hi", id="u1")])
+    stream = anthropic_provider.stream("claude-3", [UserMessage(role="user", content="Hi", id="u1")], tools=[])
 
     results = [msg async for msg in stream]
 

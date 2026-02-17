@@ -2,13 +2,14 @@ import json
 from typing import Sequence, AsyncGenerator, TYPE_CHECKING
 from uuid import uuid4
 
+from openai.types.shared_params import FunctionDefinition
 from openai.types.chat import ChatCompletionMessageParam, ChatCompletionSystemMessageParam, \
     ChatCompletionToolMessageParam, ChatCompletionUserMessageParam, ChatCompletionMessageFunctionToolCallParam, \
-    ChatCompletionAssistantMessageParam
+    ChatCompletionAssistantMessageParam, ChatCompletionFunctionToolParam
 from openai.types.chat.chat_completion_message_function_tool_call_param import Function
 
-from .. import ToolUse
-from ..message import Message, AssistantContentBlock, Text, AssistantMessage
+from ..tool import Tool
+from ..message import Message, AssistantContentBlock, Text, AssistantMessage, ToolUse
 from .llm_provider import LLMProvider
 
 if TYPE_CHECKING:
@@ -31,8 +32,20 @@ class OpenAIProvider(LLMProvider):
     async def close(self):
         await self._client.close()
 
-    async def stream(self, model: str, messages: Sequence[Message], **kwargs) -> AsyncGenerator[AssistantMessage, None]:
+    async def stream(self, model: str, messages: Sequence[Message], tools: Sequence[Tool], **kwargs) \
+            -> AsyncGenerator[AssistantMessage, None]:
         converted, last_user_message_id = self._convert_messages(messages)
+        # noinspection PyTypeChecker
+        tool_params = [
+            ChatCompletionFunctionToolParam(
+                type='function',
+                function=FunctionDefinition(
+                    name=tool.name,
+                    description=tool.description,
+                    parameters=tool.parameters
+                )
+            ) for tool in tools
+        ]
 
         text_buffer: list[str] = []
         current_tool_index: int | None = None
@@ -45,6 +58,7 @@ class OpenAIProvider(LLMProvider):
         stream = await self._client.chat.completions.create(
             model=model,
             messages=converted,
+            tools=tool_params,
             stream=True,
             **kwargs
         )

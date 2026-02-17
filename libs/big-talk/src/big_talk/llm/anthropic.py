@@ -2,10 +2,12 @@ from typing import Sequence, AsyncGenerator, Union
 from uuid import uuid4
 
 from anthropic import Omit, omit
-from anthropic.types import MessageParam, ToolResultBlockParam, ThinkingBlockParam, TextBlockParam, ToolUseBlockParam
+from anthropic.types import MessageParam, ToolResultBlockParam, ThinkingBlockParam, TextBlockParam, ToolUseBlockParam, \
+    ToolParam
 
 from .llm_provider import LLMProvider
-from ..message import Message, AssistantContentBlock, ToolResult, ToolUse, Text, AssistantMessage
+from ..tool import Tool
+from ..message import Message, AssistantContentBlock, ToolUse, Text, AssistantMessage
 
 
 class AnthropicProvider(LLMProvider):
@@ -27,9 +29,22 @@ class AnthropicProvider(LLMProvider):
         result = await self._client.messages.count_tokens(model=model, system=system, messages=converted, **kwargs)
         return result.input_tokens
 
-    async def stream(self, model: str, messages: Sequence[Message], **kwargs) -> AsyncGenerator[AssistantMessage, None]:
+    async def stream(self, model: str, messages: Sequence[Message], tools: Sequence[Tool], **kwargs) \
+            -> AsyncGenerator[AssistantMessage, None]:
         system, converted, last_user_message_id = self._convert_messages(messages)
-        async with self._client.messages.stream(model=model, system=system, messages=converted, **kwargs) as stream:
+        # noinspection PyTypeChecker
+        tool_params = [
+            ToolParam(
+                name=tool.name,
+                description=tool.description,
+                input_schema=tool.parameters
+            ) for tool in tools
+        ]
+        async with self._client.messages.stream(model=model,
+                                                system=system,
+                                                messages=converted,
+                                                tools=tool_params,
+                                                **kwargs) as stream:
             message_id = str(uuid4())
             blocks: list[AssistantContentBlock] = []
             async for chunk in stream:
