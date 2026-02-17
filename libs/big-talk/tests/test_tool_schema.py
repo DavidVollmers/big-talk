@@ -279,3 +279,57 @@ def test_boss_level_schema():
     assert "filter" not in reqs
     assert props["filter"]["type"] == "string"
     assert props["filter"]["description"] == "Optional filter"
+
+
+def test_schema_sanitization_no_nulls():
+    """
+    Verify that the generated schema does NOT contain any `None` values
+    (e.g. "description": null). Strict LLM providers (like Anthropic)
+    reject schemas with null descriptions.
+    """
+
+    # 1. Define a tool with types that often cause "description": None
+    # We purposefully do NOT add a docstring for parameters to trigger the default None.
+    def bare_types_tool(
+            tags: list[str],  # Often produces {"type": "array", "description": null}
+            count: int = 1,  # Often produces {"type": "integer", "description": null}
+            metadata: dict = None  # Often produces {"type": "object", "description": null}
+    ):
+        """A tool with no specific parameter docstrings."""
+        pass
+
+    tool = Tool.from_func(bare_types_tool)
+    schema = tool.parameters
+
+    # 2. Recursive check for None values
+    def assert_no_nulls(obj, path=""):
+        if isinstance(obj, dict):
+            for k, v in obj.items():
+                current_path = f"{path}.{k}" if path else k
+
+                # THE CRITICAL ASSERTION: No value should be None
+                assert v is not None, f"Found explicit None at '{current_path}' (Should be omitted)"
+
+                # Extra check: descriptions must be strings
+                if k == "description":
+                    assert isinstance(v, str), f"Description at '{current_path}' is not a string: {v}"
+
+                assert_no_nulls(v, current_path)
+
+        elif isinstance(obj, list):
+            for i, item in enumerate(obj):
+                assert_no_nulls(item, f"{path}[{i}]")
+
+    # 3. Run the verification
+    assert_no_nulls(schema)
+
+    # 4. Specific spot checks
+    props = schema["properties"]
+
+    # "tags" should be an array, but 'description' key should be missing completely
+    assert props["tags"]["type"] == "array"
+    assert "description" not in props["tags"]
+
+    # "count" should be integer, 'description' missing
+    assert props["count"]["type"] == "integer"
+    assert "description" not in props["count"]

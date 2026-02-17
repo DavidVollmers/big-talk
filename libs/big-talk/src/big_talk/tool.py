@@ -128,7 +128,7 @@ class Tool:
         if defs:
             raw_parameters['$defs'] = defs
 
-        parameters = ToolParameters(**raw_parameters)
+        parameters = ToolParameters(**cls._sanitize_schema(raw_parameters))
 
         return cls(name=func.__name__, description=description, parameters=parameters, func=func, metadata=metadata)
 
@@ -150,6 +150,18 @@ class Tool:
 
         search_and_extract(schema)
         return collected_defs
+
+    @staticmethod
+    def _sanitize_schema(schema: Any) -> Any:
+        if isinstance(schema, dict):
+            return {
+                k: Tool._sanitize_schema(v)
+                for k, v in schema.items()
+                if v is not None
+            }
+        elif isinstance(schema, list):
+            return [Tool._sanitize_schema(item) for item in schema]
+        return schema
 
     @staticmethod
     def _schema_from_type(t: type) -> ToolParametersProperty:
