@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Callable, Sequence, TypeAlias, AsyncGenerator, Any
+from typing import Callable, TypeAlias, AsyncGenerator, Any
 
 from .middleware import MiddlewareStack, MiddlewareHandler, Middleware
 from .tool import Tool
@@ -11,8 +11,8 @@ from .message import Message, OutputMessage
 class StreamContext:
     model: str
     iteration: int
-    tools: Sequence[Tool]
-    messages: Sequence[Message]
+    tools: list[Tool]
+    messages: list[Message]
     _provider_resolver: Callable[[str], tuple[LLMProvider, str]]
 
     def get_llm_provider(self) -> tuple[LLMProvider, str]:
