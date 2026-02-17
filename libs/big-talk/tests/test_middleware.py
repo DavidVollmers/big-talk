@@ -163,10 +163,17 @@ async def test_middleware_history_loading_deduplication(bigtalk, create_provider
             # Prepend DB history to the current input
             ctx.messages[:] = db_history + ctx.messages
 
+            yield AppMessage(role="app", content=None, id="start_msg", type="start")
+
         async for msg in handler(ctx, **kwargs):
             yield msg
 
     bigtalk.streaming.use(history_middleware)
+
+    async def end_middleware(handler, ctx):
+        yield AppMessage(role="app", content=None, id="end_msg", type="end")
+
+    bigtalk.stream_result.use(end_middleware)
 
     # 3. Setup Provider to Force a Loop (Tool Use)
     # Turn 1: Returns Tool Call
@@ -196,7 +203,7 @@ async def test_middleware_history_loading_deduplication(bigtalk, create_provider
         current_len = len(messages)
 
         # Iteration 0: Expecting 3 messages (2 DB + 1 Input)
-        if current_len == 3:
+        if current_len == 4:
             yield tool_use_msg
         # Iteration 1: Expecting 5 messages (2 DB + 1 Input + 1 ToolUse + 1 ToolResult)
         else:
@@ -220,21 +227,23 @@ async def test_middleware_history_loading_deduplication(bigtalk, create_provider
     assert history_loaded_count == 1, "Middleware should only load history on iteration 0"
 
     # B. Verify Result contains the final answer
-    assert results[-1]['content'][0]['text'] == "Final Answer"
+    assert results[-1]['role'] == "app"
+    assert results[-1]['type'] == "end"
+    assert results[-2]['content'][0]['text'] == "Final Answer"
 
     # C. Verify NO Duplication in the Context passed to the Provider
     assert len(captured_message_lists) == 2, "Provider should have been called exactly twice (Iteration 0 and 1)"
 
-    # Call 1 (Iteration 0): [Old1, Old2, UserInput]
+    # Call 1 (Iteration 0): [Old1, Old2, UserInput, Start]
     assert len(
-        captured_message_lists[0]) == 3, f"Iteration 0 should have 3 messages, got {len(captured_message_lists[0])}"
+        captured_message_lists[0]) == 4, f"Iteration 0 should have 4 messages, got {len(captured_message_lists[0])}"
     assert captured_message_lists[0][0]['id'] == "old_1"
 
-    # Call 2 (Iteration 1): [Old1, Old2, UserInput, ToolUse, ToolResult]
-    # If middleware duplicated history, this would be 3 + 2 (DB) + 2 (Tools) = 7 or more!
+    # Call 2 (Iteration 1): [Old1, Old2, UserInput, Start, ToolUse, ToolResult]
     assert len(captured_message_lists[
-                   1]) == 5, f"Iteration 1 should have 5 messages, got {len(captured_message_lists[1])}. Duplication detected!"
+                   1]) == 6, f"Iteration 1 should have 6 messages, got {len(captured_message_lists[1])}. Duplication detected!"
 
     # Verify the sequence is clean
     ids = [m['id'] for m in captured_message_lists[1]]
-    assert ids == ["old_1", "old_2", simple_message['id'], "msg_tool", ids[4]]  # ids[4] is generated tool result ID
+    assert ids == ["old_1", "old_2", simple_message['id'], "start_msg", "msg_tool",
+                   ids[5]]  # ids[4] is generated tool result ID

@@ -4,6 +4,7 @@ from typing import Sequence, Any, AsyncGenerator, Callable
 from uuid import uuid4
 
 from .middleware import MiddlewareStack
+from .stream_result import StreamResultMiddlewareStack, BaseStreamResultHandler, StreamResultContext
 from .streaming import StreamContext, StreamingMiddlewareStack, BaseStreamHandler
 from .tool import Tool
 from .llm import LLMProvider, LLMProviderFactory
@@ -19,11 +20,16 @@ class BigTalk:
             'openai': self._openai_provider_factory,
         }
         self._streaming: StreamingMiddlewareStack = MiddlewareStack(BaseStreamHandler())
+        self._stream_result: StreamResultMiddlewareStack = MiddlewareStack(BaseStreamResultHandler())
         self._tool_execution: ToolExecutionMiddlewareStack = MiddlewareStack(BaseToolExecutionHandler())
 
     @property
     def streaming(self) -> StreamingMiddlewareStack:
         return self._streaming
+
+    @property
+    def stream_result(self) -> StreamResultMiddlewareStack:
+        return self._stream_result
 
     @property
     def tool_execution(self) -> ToolExecutionMiddlewareStack:
@@ -73,6 +79,7 @@ class BigTalk:
         stream_handler = self._streaming.build()
         tool_execution_handler = self._tool_execution.build()
 
+        iteration = 0
         for iteration in range(max_iterations):
             stream_ctx = StreamContext(model=model, tools=normalized_tools, messages=current_history,
                                        _provider_resolver=self._get_llm_provider, iteration=iteration)
@@ -125,6 +132,16 @@ class BigTalk:
 
                 yield tool_result_message
                 current_history.append(tool_result_message)
+
+        result_ctx = StreamResultContext(
+            model=model,
+            iterations=iteration,
+            input_messages=messages,
+            message_history=current_history
+        )
+        stream_result_handler = self._stream_result.build()
+        async for message in stream_result_handler(result_ctx):
+            yield message
 
     async def execute_tool(self, tool: Callable | Tool, params: dict[str, Any],
                            messages: Sequence[Message] = None, metadata: dict[str, Any] = None) -> str | None:
