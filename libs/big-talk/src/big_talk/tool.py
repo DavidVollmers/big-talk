@@ -1,6 +1,7 @@
 import inspect
 import logging
 from dataclasses import dataclass
+from types import UnionType
 from typing import Any, Callable, get_type_hints, get_origin, Literal, get_args, TypedDict, Sequence, Union, TypeAlias, \
     Optional, is_typeddict, Annotated, overload, Iterable
 
@@ -138,48 +139,50 @@ class Tool:
                     description = arg
                     break
 
+            origin = get_origin(t)
+
+        schema: ToolParametersProperty | None = None
+
         # Handle Optional (e.g. Optional[str] or Union[str, None])
-        if origin is Union:
+        if origin is Union or origin is UnionType:
             args = get_args(t)
             non_none_args = [a for a in args if a is not type(None)]
             if len(non_none_args) == 1:
-                return Tool._schema_from_type(non_none_args[0])
+                schema = Tool._schema_from_type(non_none_args[0])
             else:
-                return Tool._schema_from_type(non_none_args[0])
+                schema = Tool._schema_from_type(non_none_args[0])
+            schema['description'] = description or schema.get('description', '')
 
         # Pydantic support
-        if hasattr(t, 'model_json_schema') and callable(t.model_json_schema):
+        elif hasattr(t, 'model_json_schema') and callable(t.model_json_schema):
             # noinspection PyTypeChecker
-            schema: dict[str, Any] = t.model_json_schema()
+            schema = t.model_json_schema()
             schema.pop('title', None)
-            if description:
-                schema['description'] = description
-            return schema
+            schema['description'] = description or schema.get('description', '')
 
         # Handle basic types
-        if t == str:
-            return Property(type='string', description=description)
+        elif t == str:
+            schema = Property(type='string', description=description)
         elif t == int:
-            return Property(type='integer', description=description)
+            schema = Property(type='integer', description=description)
         elif t == float:
-            return Property(type='number', description=description)
+            schema = Property(type='number', description=description)
         elif t == bool:
-            return Property(type='boolean', description=description)
+            schema = Property(type='boolean', description=description)
 
         # Handle Literals
-        if get_origin(t) is Literal:
-            return EnumProperty(type='string', enum=list(get_args(t)), description=description)
+        elif origin is Literal:
+            schema = EnumProperty(type='string', enum=list(get_args(t)), description=description)
 
         # Handle Lists (e.g. list[str])
-        if t == list or get_origin(t) == list:
+        elif t == list or origin == list:
             args = get_args(t)
             item_schema = Tool._schema_from_type(args[0]) if args else {}
-            return ArrayProperty(type='array', items=item_schema, description=description)
+            schema = ArrayProperty(type='array', items=item_schema, description=description)
 
         # Handle TypedDict
-        if is_typeddict(t):
+        elif is_typeddict(t):
             properties = {}
-            required = []
 
             # get_type_hints handles inheritance and forward refs better than __annotations__
             hints = get_type_hints(t, include_extras=True)
@@ -187,12 +190,21 @@ class Tool:
             for key, value in hints.items():
                 properties[key] = Tool._schema_from_type(value)
 
-                # TypedDicts usually mark all keys required unless using total=False
-                # We assume required for tool use safety, unless Optional is detected
-                if get_origin(value) is not Union or type(None) not in get_args(value):
+            required_keys = set(getattr(t, "__required_keys__", []))
+            required = []
+            for key in required_keys:
+                val_type = hints[key]
+                origin = get_origin(val_type)
+                args = get_args(val_type)
+
+                # Check if the type allows None (Union[..., None] or ... | None)
+                is_nullable = (origin is Union or origin is UnionType) and type(None) in args
+
+                # Only keep it required if it is NOT nullable
+                if not is_nullable:
                     required.append(key)
 
-            return ObjectProperty(
+            schema = ObjectProperty(
                 type='object',
                 properties=properties,
                 required=required,
@@ -200,10 +212,13 @@ class Tool:
             )
 
         # Fallback for dicts or complex types (treat as generic object)
-        if t == dict or get_origin(t) == dict:
-            return DictionaryProperty(type='object', additionalProperties=True, description=description)
+        elif t == dict or origin == dict:
+            schema = DictionaryProperty(type='object', additionalProperties=True, description=description)
 
-        raise NotImplementedError(f'Type {t} is not supported in Tool parameter type mapping.')
+        if schema is None:
+            raise NotImplementedError(f'Type {t} (origin: {origin}) is not supported.')
+
+        return schema
 
 
 @overload

@@ -105,3 +105,90 @@ def test_pydantic_model_support():
     assert props["user"]["properties"]["id"]["type"] == "integer"
     assert "User ID" in props["user"]["properties"]["id"]["description"]
     assert "id" in props["user"]["required"]
+
+
+def test_annotated_union_unwrapping():
+    """
+    Edge Case 1: 'Stale Origin' Bug.
+    Verify that Annotated[str | None] is treated as Optional[str],
+    not as a raw Annotated object (which would crash schema gen).
+    """
+
+    # This uses Python 3.10+ pipe syntax inside Annotated
+    def func(
+            # The annotated wrapper makes get_origin return Annotated first.
+            # We must peel it off, then realize inside is a UnionType (str | None).
+            arg: Annotated[str | None, "A description"] = None
+    ):
+        pass
+
+    tool = Tool.from_func(func)
+    props = tool.parameters["properties"]
+
+    # 1. Check it didn't crash
+    assert "arg" in props
+
+    # 2. Check it correctly identified 'str' as the core type
+    # (If origin wasn't refreshed, this might default to object or crash)
+    assert props["arg"]["type"] == "string"
+
+    # 3. Check description persisted
+    assert "A description" in props["arg"]["description"]
+
+    # 4. Check it is NOT required (because of = None)
+    assert "arg" not in tool.parameters["required"]
+
+
+def test_typeddict_optional_pipe_syntax():
+    """
+    Edge Case 2: 'TypedDict Required' Bug.
+    Verify that fields marked as `Type | None` in a TypedDict
+    are NOT added to the 'required' list.
+    """
+
+    class Config(TypedDict):
+        mandatory: int
+        # Python 3.10+ syntax.
+        # Previously, is_optional check failed for types.UnionType
+        optional_pipe: str | None
+
+    def configure(cfg: Config): pass
+
+    tool = Tool.from_func(configure)
+    schema = tool.parameters["properties"]["cfg"]
+    required_fields = schema["required"]
+
+    # 'mandatory' should be there
+    assert "mandatory" in required_fields
+
+    # 'optional_pipe' should be MISSING because it includes None
+    assert "optional_pipe" not in required_fields
+
+    # Verify types
+    assert schema["properties"]["mandatory"]["type"] == "integer"
+    assert schema["properties"]["optional_pipe"]["type"] == "string"
+
+
+def test_modern_union_syntax():
+    """
+    Edge Case 3: General types.UnionType support.
+    Verify that 'int | str' and 'str | None' work in standard args.
+    """
+
+    def processor(
+            # Simple Optional
+            filter_val: str | None = None,
+            # Union of primitives (should default to first type or Any)
+            id_val: int | str = 1
+    ):
+        pass
+
+    tool = Tool.from_func(processor)
+    props = tool.parameters["properties"]
+
+    # 1. Optional[str] -> string
+    assert props["filter_val"]["type"] == "string"
+    assert "filter_val" not in tool.parameters["required"]
+
+    # 2. Union[int, str] -> integer (Our logic picks the first one)
+    assert props["id_val"]["type"] == "integer"
