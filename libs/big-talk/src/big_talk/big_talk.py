@@ -1,14 +1,13 @@
 import asyncio
-from collections import defaultdict
 from typing import Sequence, Any, AsyncGenerator, Callable
 from uuid import uuid4
 
 from .middleware import MiddlewareStack
-from .stream_result import StreamResultMiddlewareStack, BaseStreamResultHandler, StreamResultContext
-from .streaming import StreamContext, StreamingMiddlewareStack, BaseStreamHandler
+from .stream import StreamMiddlewareStack, BaseStreamHandler, StreamContext
+from .stream_iteration import StreamIterationMiddlewareStack, BaseStreamIterationHandler
 from .tool import Tool
 from .llm import LLMProvider, LLMProviderFactory
-from .message import Message, ToolUse, ToolMessage
+from .message import Message, ToolUse
 from .tool_execution import ToolExecutionMiddlewareStack, BaseToolExecutionHandler, ToolExecutionContext
 
 
@@ -19,17 +18,17 @@ class BigTalk:
             'anthropic': self._anthropic_provider_factory,
             'openai': self._openai_provider_factory,
         }
-        self._streaming: StreamingMiddlewareStack = MiddlewareStack(BaseStreamHandler())
-        self._stream_result: StreamResultMiddlewareStack = MiddlewareStack(BaseStreamResultHandler())
+        self._stream_iteration: StreamIterationMiddlewareStack = MiddlewareStack(BaseStreamIterationHandler())
         self._tool_execution: ToolExecutionMiddlewareStack = MiddlewareStack(BaseToolExecutionHandler())
+        self._streaming: StreamMiddlewareStack = MiddlewareStack(BaseStreamHandler())
 
     @property
-    def streaming(self) -> StreamingMiddlewareStack:
+    def streaming(self) -> StreamMiddlewareStack:
         return self._streaming
 
     @property
-    def stream_result(self) -> StreamResultMiddlewareStack:
-        return self._stream_result
+    def stream_iteration(self) -> StreamIterationMiddlewareStack:
+        return self._stream_iteration
 
     @property
     def tool_execution(self) -> ToolExecutionMiddlewareStack:
@@ -74,73 +73,22 @@ class BigTalk:
 
         normalized_tools = self._normalize_tools(tools)
 
-        current_history = list(messages)
-
-        stream_handler = self._streaming.build()
+        stream_iteration_handler = self._stream_iteration.build()
         tool_execution_handler = self._tool_execution.build()
 
-        iteration = 0
-        for iteration in range(max_iterations):
-            stream_ctx = StreamContext(model=model, tools=normalized_tools, messages=current_history,
-                                       _provider_resolver=self._get_llm_provider, iteration=iteration)
+        streaming_handler = self._streaming.build()
 
-            tool_uses_by_parent: list[tuple[str, ToolUse]] = []
-            async for message in stream_handler(stream_ctx, **kwargs):
-                yield message
-
-                is_app_message = message['role'] == 'app'
-                if not is_app_message and not message.get('is_aggregate'):
-                    continue
-
-                current_history.append(message)
-
-                if is_app_message:
-                    continue
-
-                parent_id = message['id']
-
-                tool_uses = [b for b in message['content'] if b['type'] == 'tool_use']
-                for tool_use in tool_uses:
-                    tool_uses_by_parent.append((parent_id, tool_use))
-
-            if not tool_uses_by_parent:
-                break
-
-            tool_uses = [tu for _, tu in tool_uses_by_parent]
-
-            tool_execution_ctx = ToolExecutionContext(
-                tool_uses=tool_uses,
-                tools=normalized_tools,
-                messages=current_history,
-                iteration=iteration
-            )
-
-            tool_tasks = await tool_execution_handler(tool_execution_ctx)
-            tool_results = await asyncio.gather(*tool_tasks)
-
-            results_by_parent = defaultdict(list)
-            for (parent_id, _), result in zip(tool_uses_by_parent, tool_results):
-                results_by_parent[parent_id].append(result)
-
-            for parent_id, results in results_by_parent.items():
-                tool_result_message = ToolMessage(
-                    id=str(uuid4()),
-                    role='tool',
-                    content=results,
-                    parent_id=parent_id,
-                )
-
-                yield tool_result_message
-                current_history.append(tool_result_message)
-
-        result_ctx = StreamResultContext(
+        ctx = StreamContext(
             model=model,
-            iterations=iteration,
-            input_messages=messages,
-            message_history=current_history
+            tools=normalized_tools,
+            messages=list(messages),
+            _provider_resolver=self._get_llm_provider,
+            max_iterations=max_iterations,
+            _stream_iteration_handler=stream_iteration_handler,
+            _tool_execution_handler=tool_execution_handler
         )
-        stream_result_handler = self._stream_result.build()
-        async for message in stream_result_handler(result_ctx):
+
+        async for message in streaming_handler(ctx, **kwargs):
             yield message
 
     async def execute_tool(self, tool: Callable | Tool, params: dict[str, Any],

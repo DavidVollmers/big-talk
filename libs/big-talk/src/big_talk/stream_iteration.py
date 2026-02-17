@@ -1,3 +1,4 @@
+from abc import ABC
 from dataclasses import dataclass
 from typing import Callable, TypeAlias, AsyncGenerator, Any
 
@@ -8,9 +9,8 @@ from .message import Message, OutputMessage
 
 
 @dataclass
-class StreamContext:
+class StreamContextBase(ABC):
     model: str
-    iteration: int
     tools: list[Tool]
     messages: list[Message]
     _provider_resolver: Callable[[str], tuple[LLMProvider, str]]
@@ -19,15 +19,20 @@ class StreamContext:
         return self._provider_resolver(self.model)
 
 
-StreamHandler: TypeAlias = MiddlewareHandler[StreamContext, AsyncGenerator[OutputMessage, None]]
-
-StreamingMiddleware: TypeAlias = Middleware[StreamContext, AsyncGenerator[OutputMessage, None]]
-
-StreamingMiddlewareStack: TypeAlias = MiddlewareStack[StreamContext, AsyncGenerator[OutputMessage, None]]
+@dataclass
+class StreamIterationContext(StreamContextBase):
+    iteration: int
 
 
-class BaseStreamHandler(StreamHandler):
-    async def __call__(self, ctx: StreamContext, **kwargs: Any) -> AsyncGenerator[OutputMessage, None]:
+StreamIterationHandler: TypeAlias = MiddlewareHandler[StreamIterationContext, AsyncGenerator[OutputMessage, None]]
+
+StreamIterationMiddleware: TypeAlias = Middleware[StreamIterationContext, AsyncGenerator[OutputMessage, None]]
+
+StreamIterationMiddlewareStack: TypeAlias = MiddlewareStack[StreamIterationContext, AsyncGenerator[OutputMessage, None]]
+
+
+class BaseStreamIterationHandler(StreamIterationHandler):
+    async def __call__(self, ctx: StreamIterationContext, **kwargs: Any) -> AsyncGenerator[OutputMessage, None]:
         provider, model_name = ctx.get_llm_provider()
         async for message in provider.stream(
                 model=model_name,
