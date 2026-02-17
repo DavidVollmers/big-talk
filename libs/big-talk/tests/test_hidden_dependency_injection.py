@@ -26,7 +26,7 @@ async def test_hidden_dependency_injection(bigtalk, simple_message):
         def query(self): return "DB_RESULT"
 
     # The Tool definition
-    @tool(hidden_default_types=(Dependency,))
+    @tool(hidden_default_types=[Dependency])
     async def query_db(query_str: str, db: DatabaseClient = Dependency()):
         """Query the database."""
         return f"{query_str} -> {db.query()}"

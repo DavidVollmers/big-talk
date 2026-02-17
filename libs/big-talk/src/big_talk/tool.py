@@ -58,11 +58,14 @@ class Tool:
                   func: Callable,
                   *docstring_args,
                   metadata: dict[str, Any] = None,
-                  hidden_default_types: tuple[type, ...] = None,
-                  hidden_default_values: Sequence[Any] = None,
+                  hidden_default_types: Iterable[type] = None,
+                  hidden_default_values: Iterable[Any] = None,
                   **docstring_kwargs) -> 'Tool':
         if not metadata:
             metadata = {}
+
+        if hidden_default_types:
+            hidden_default_types = tuple(hidden_default_types)
 
         doc = docstring_parser.parse(inspect.getdoc(func) or '')
 
@@ -210,16 +213,16 @@ def tool(func: Callable) -> Tool: ...
 @overload
 def tool(*docstring_args,
          metadata: dict[str, Any] = None,
-         hidden_default_types: tuple[type, ...] = None,
-         hidden_default_values: Sequence[Any] = None,
+         hidden_default_types: Iterable[type] = None,
+         hidden_default_values: Iterable[Any] = None,
          **docstring_kwargs) -> Callable[[Callable], Tool]: ...
 
 
 def tool(func: Callable | Any = None,
          *args,
          metadata: dict[str, Any] = None,
-         hidden_default_types: tuple[type, ...] = None,
-         hidden_default_values: Sequence[Any] = None,
+         hidden_default_types: Iterable[type] = None,
+         hidden_default_values: Iterable[Any] = None,
          **kwargs) -> Tool | Callable[[Callable], Tool]:
     """
     Decorator to convert a function into a BigTalk Tool.
