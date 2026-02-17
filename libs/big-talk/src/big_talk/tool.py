@@ -54,7 +54,13 @@ class Tool:
     metadata: dict[str, Any]
 
     @classmethod
-    def from_func(cls, func: Callable, *docstring_args, metadata: dict[str, Any] = None, **docstring_kwargs) -> 'Tool':
+    def from_func(cls,
+                  func: Callable,
+                  *docstring_args,
+                  metadata: dict[str, Any] = None,
+                  hidden_default_types: tuple[type, ...] = None,
+                  hidden_default_values: Sequence[Any] = None,
+                  **docstring_kwargs) -> 'Tool':
         if not metadata:
             metadata = {}
 
@@ -85,11 +91,16 @@ class Tool:
             if param_name in ('self', 'cls'):
                 continue
 
-            # Map Python Type -> JSON Schema
+            is_required = param.default == inspect.Parameter.empty
+            if not is_required:
+                if hidden_default_values and param.default in hidden_default_values:
+                    continue
+                if hidden_default_types and isinstance(param.default, hidden_default_types):
+                    continue
+
             python_type = type_hints.get(param_name, Any)
             json_schema = cls._schema_from_type(python_type)
 
-            # Inject Description from Docstring
             if param_name in param_docs and param_docs[param_name]:
                 param_description = param_docs[param_name]
                 if json_schema.get('description'):
@@ -97,11 +108,9 @@ class Tool:
                 else:
                     json_schema['description'] = param_description
 
-            # Add to properties
             properties[param_name] = json_schema
 
-            # Check if required (no default value)
-            if param.default == inspect.Parameter.empty:
+            if is_required:
                 required.append(param_name)
 
         parameters = ToolParameters(
@@ -199,11 +208,19 @@ def tool(func: Callable) -> Tool: ...
 
 
 @overload
-def tool(*docstring_args, metadata: dict[str, Any] = None, **docstring_kwargs) -> Callable[[Callable], Tool]: ...
+def tool(*docstring_args,
+         metadata: dict[str, Any] = None,
+         hidden_default_types: tuple[type, ...] = None,
+         hidden_default_values: Sequence[Any] = None,
+         **docstring_kwargs) -> Callable[[Callable], Tool]: ...
 
 
-def tool(func: Callable | Any = None, *args, metadata: dict[str, Any] = None, **kwargs) \
-        -> Tool | Callable[[Callable], Tool]:
+def tool(func: Callable | Any = None,
+         *args,
+         metadata: dict[str, Any] = None,
+         hidden_default_types: tuple[type, ...] = None,
+         hidden_default_values: Sequence[Any] = None,
+         **kwargs) -> Tool | Callable[[Callable], Tool]:
     """
     Decorator to convert a function into a BigTalk Tool.
 
@@ -222,8 +239,10 @@ def tool(func: Callable | Any = None, *args, metadata: dict[str, Any] = None, **
             format_args.insert(0, func)
 
         def wrapper(f: Callable) -> Tool:
-            return Tool.from_func(f, metadata=metadata, *format_args, **kwargs)
+            return Tool.from_func(f, metadata=metadata, hidden_default_values=hidden_default_values,
+                                  hidden_default_types=hidden_default_types, *format_args, **kwargs)
 
         return wrapper
 
-    return Tool.from_func(func, metadata=metadata, *args, **kwargs)
+    return Tool.from_func(func, metadata=metadata, hidden_default_values=hidden_default_values,
+                          hidden_default_types=hidden_default_types, *args, **kwargs)
