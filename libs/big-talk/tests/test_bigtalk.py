@@ -2,7 +2,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from big_talk import BigTalk
+from big_talk import BigTalk, AppMessage
 
 
 @pytest.mark.asyncio
@@ -169,3 +169,32 @@ def test_override_default_provider_with_kwargs():
 
     # Ensure the override worked
     assert bt._provider_factories["anthropic"] == configured_anthropic_factory
+
+
+@pytest.mark.asyncio
+async def test_app_message(bigtalk, create_provider, simple_message):
+    provider = create_provider(name="test-4")
+    bigtalk.add_provider("test", lambda: provider)
+
+    @bigtalk.streaming.use
+    async def add_app_message(handler, ctx, **kwargs):
+        # Add an app message at the end of the stream
+        async for msg in handler(ctx, **kwargs):
+            yield msg
+        yield AppMessage(content=None, id="app-msg-1", role="app", type="test_app_message",
+                         parent_id=simple_message['id'])
+
+    # Action
+    response = bigtalk.stream("test/test-4", [simple_message])
+
+    # Consume
+    results = [msg async for msg in response]
+
+    # Assert
+    assert len(results) == 3
+    assert results[0]['content'][0]['text'] == "hello"
+    assert results[2]['type'] == "test_app_message"
+
+    # Verify the provider received the stripped model name
+    assert len(provider.stream_calls) == 1
+    assert provider.stream_calls[0]["model"] == "test-4"

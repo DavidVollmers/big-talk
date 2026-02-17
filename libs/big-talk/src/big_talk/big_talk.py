@@ -81,10 +81,14 @@ class BigTalk:
             async for message in stream_handler(stream_ctx, **kwargs):
                 yield message
 
-                if not message.get('is_aggregate', True):
+                is_app_message = message['role'] == 'app'
+                if not is_app_message and not message.get('is_aggregate'):
                     continue
 
                 current_history.append(message)
+
+                if is_app_message:
+                    continue
 
                 parent_id = message['id']
 
