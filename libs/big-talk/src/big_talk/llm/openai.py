@@ -46,6 +46,7 @@ class OpenAIProvider(LLMProvider):
                 )
             ) for tool in tools
         ]
+        tool_map = {tool.name: tool for tool in tools}
 
         text_buffer: list[str] = []
         current_tool_index: int | None = None
@@ -89,7 +90,8 @@ class OpenAIProvider(LLMProvider):
                     idx = tool_chunk.index
 
                     if current_tool_index is not None and idx != current_tool_index:
-                        prev_block = self._build_tool_use_block(current_tool_id, current_tool_name, current_tool_args)
+                        prev_block = self._build_tool_use_block(current_tool_id, current_tool_name, current_tool_args,
+                                                                tool_map)
                         blocks.append(prev_block)
 
                         yield AssistantMessage(
@@ -125,7 +127,7 @@ class OpenAIProvider(LLMProvider):
             )
 
         if current_tool_index is not None:
-            last_block = self._build_tool_use_block(current_tool_id, current_tool_name, current_tool_args)
+            last_block = self._build_tool_use_block(current_tool_id, current_tool_name, current_tool_args, tool_map)
             blocks.append(last_block)
             yield AssistantMessage(
                 id=message_id,
@@ -144,13 +146,14 @@ class OpenAIProvider(LLMProvider):
         )
 
     @staticmethod
-    def _build_tool_use_block(tool_id: str, tool_name: str, arg_parts: list[str]) -> ToolUse:
+    def _build_tool_use_block(tool_id: str, tool_name: str, arg_parts: list[str], tool_map: dict[str, Tool]) -> ToolUse:
+        metadata = tool_map[tool_name].metadata if tool_name in tool_map else None
         return ToolUse(
             type='tool_use',
             id=tool_id,
             name=tool_name,
             params=json.loads(''.join(arg_parts)),
-            metadata=None
+            metadata=metadata
         )
 
     @staticmethod

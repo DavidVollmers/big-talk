@@ -40,6 +40,7 @@ class AnthropicProvider(LLMProvider):
                 input_schema=tool.parameters
             ) for tool in tools
         ]
+        tool_map = {tool.name: tool for tool in tools}
         async with self._client.messages.stream(model=model,
                                                 system=system,
                                                 messages=converted,
@@ -63,8 +64,10 @@ class AnthropicProvider(LLMProvider):
                                                thinking=chunk.content_block.thinking,
                                                signature=chunk.content_block.signature)
                 elif chunk.content_block.type == 'tool_use':
+                    metadata = tool_map[
+                        chunk.content_block.name].metadata if chunk.content_block.name in tool_map else None
                     block = ToolUse(type='tool_use', id=chunk.content_block.id, name=chunk.content_block.name,
-                                    params=chunk.content_block.input, metadata=None)
+                                    params=chunk.content_block.input, metadata=metadata)
                 else:
                     # TODO redacted thinking
                     continue
