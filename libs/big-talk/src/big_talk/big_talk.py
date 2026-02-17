@@ -7,7 +7,7 @@ from .middleware import MiddlewareStack
 from .streaming import StreamContext, StreamingMiddlewareStack, BaseStreamHandler
 from .tool import Tool
 from .llm import LLMProvider, LLMProviderFactory
-from .message import Message, SystemMessage, ToolUse, ToolMessage
+from .message import Message, ToolUse, ToolMessage
 from .tool_execution import ToolExecutionMiddlewareStack, BaseToolExecutionHandler, ToolExecutionContext
 
 
@@ -116,11 +116,40 @@ class BigTalk:
                     role='tool',
                     content=results,
                     parent_id=parent_id,
-                    metadata=None
                 )
 
                 yield tool_result_message
                 current_history.append(tool_result_message)
+
+    async def execute_tool(self, tool: Callable | Tool, params: dict[str, Any],
+                           messages: Sequence[Message] = None, metadata: dict[str, Any] = None) -> str | None:
+        normalized_tool = self._normalize_tools([tool])[0]
+
+        tool_use = ToolUse(
+            type='tool_use',
+            id=str(uuid4()),
+            name=normalized_tool.name,
+            params=params,
+            metadata=metadata
+        )
+
+        context = ToolExecutionContext(
+            tool_uses=[tool_use],
+            tools=[normalized_tool],
+            messages=messages or []
+        )
+
+        handler = self._tool_execution.build()
+        tasks = await handler(context)
+        results = await asyncio.gather(*tasks)
+
+        if not results:
+            return None
+
+        result = results[0]
+        if result['is_error']:
+            raise Exception(f'Tool execution failed: {result['result']}')
+        return result['result']
 
     async def close(self):
         results = await asyncio.gather(*(provider.close() for provider in self._providers.values()),
