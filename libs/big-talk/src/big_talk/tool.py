@@ -1,9 +1,12 @@
 import inspect
+import logging
 from dataclasses import dataclass
 from typing import Any, Callable, get_type_hints, get_origin, Literal, get_args, TypedDict, Sequence, Union, TypeAlias, \
-    Optional, is_typeddict, Annotated, overload
+    Optional, is_typeddict, Annotated, overload, Iterable
 
 import docstring_parser
+
+logger = logging.getLogger(__name__)
 
 
 class Property(TypedDict):
@@ -51,7 +54,7 @@ class Tool:
     metadata: dict[str, Any]
 
     @classmethod
-    def from_func(cls, func: Callable, metadata: dict[str, Any] = None) -> 'Tool':
+    def from_func(cls, func: Callable, *docstring_args, metadata: dict[str, Any] = None, **docstring_kwargs) -> 'Tool':
         if not metadata:
             metadata = {}
 
@@ -60,6 +63,15 @@ class Tool:
         description = doc.short_description or ''
         if doc.long_description:
             description += f'\n\n{doc.long_description}'
+
+        if docstring_args or docstring_kwargs:
+            try:
+                description = description.format(*docstring_args, **docstring_kwargs)
+            except (ValueError, KeyError, IndexError):
+                logger.warning(
+                    f'Failed to format docstring for tool {func.__name__} with args {docstring_args} and '
+                    f'kwargs {docstring_kwargs}. Using unformatted description.',
+                    exc_info=True)
 
         param_docs = {p.arg_name: p.description for p in doc.params}
 
@@ -187,10 +199,11 @@ def tool(func: Callable) -> Tool: ...
 
 
 @overload
-def tool(*, metadata: dict[str, Any] = None) -> Callable[[Callable], Tool]: ...
+def tool(*docstring_args, metadata: dict[str, Any] = None, **docstring_kwargs) -> Callable[[Callable], Tool]: ...
 
 
-def tool(func: Callable = None, *, metadata: dict[str, Any] = None) -> Tool | Callable[[Callable], Tool]:
+def tool(func: Callable | Any = None, *args, metadata: dict[str, Any] = None, **kwargs) \
+        -> Tool | Callable[[Callable], Tool]:
     """
     Decorator to convert a function into a BigTalk Tool.
 
@@ -201,10 +214,16 @@ def tool(func: Callable = None, *, metadata: dict[str, Any] = None) -> Tool | Ca
       @tool(metadata={'scope': 'read'})
       def my_func(): ...
     """
-    if func is None:
+    is_factory = func is None or not callable(func)
+
+    if is_factory:
+        format_args = list(args)
+        if func is not None:
+            format_args.insert(0, func)
+
         def wrapper(f: Callable) -> Tool:
-            return Tool.from_func(f, metadata=metadata)
+            return Tool.from_func(f, metadata=metadata, *format_args, **kwargs)
 
         return wrapper
 
-    return Tool.from_func(func, metadata=metadata)
+    return Tool.from_func(func, metadata=metadata, *args, **kwargs)
