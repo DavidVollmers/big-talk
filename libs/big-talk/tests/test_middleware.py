@@ -157,23 +157,22 @@ async def test_middleware_history_loading_deduplication(bigtalk, create_provider
     async def history_middleware(handler, ctx, **kwargs):
         nonlocal history_loaded_count
 
-        # THE FIX: Only load history if iteration is 0
-        if ctx.iteration == 0:
-            history_loaded_count += 1
-            # Prepend DB history to the current input
-            ctx.messages[:] = db_history + ctx.messages
+        history_loaded_count += 1
+        # Prepend DB history to the current input
+        ctx.messages = db_history + ctx.messages
 
-            yield AppMessage(role="app", content=None, id="start_msg", type="start")
+        start_msg = AppMessage(role="app", content=None, id="start_msg", type="start")
+        yield start_msg
+        ctx.messages = ctx.messages + [start_msg]
 
         async for msg in handler(ctx, **kwargs):
             yield msg
 
+        end_msg = AppMessage(role="app", content=None, id="end_msg", type="end")
+        yield end_msg
+        ctx.messages = ctx.messages + [end_msg]
+
     bigtalk.streaming.use(history_middleware)
-
-    async def end_middleware(handler, ctx):
-        yield AppMessage(role="app", content=None, id="end_msg", type="end")
-
-    bigtalk.stream_result.use(end_middleware)
 
     # 3. Setup Provider to Force a Loop (Tool Use)
     # Turn 1: Returns Tool Call

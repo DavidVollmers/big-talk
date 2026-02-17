@@ -2,7 +2,7 @@ import asyncio
 from typing import AsyncGenerator, Sequence
 from big_talk.llm import LLMProvider
 from big_talk import Message, AssistantMessage, Text
-from big_talk.streaming import StreamContext, StreamHandler
+from big_talk.stream_iteration import StreamIterationContext, StreamIterationHandler
 
 
 class MockToolProvider(LLMProvider):
@@ -60,7 +60,7 @@ class SpyMiddleware:
         self.mutate_model_to = mutate_model_to
         self.call_log = []
 
-    async def __call__(self, handler: StreamHandler, ctx: StreamContext, **kwargs) \
+    async def __call__(self, handler: StreamIterationHandler, ctx: StreamIterationContext, **kwargs) \
             -> AsyncGenerator[AssistantMessage, None]:
         self.call_log.append("enter")
 

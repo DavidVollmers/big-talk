@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import TypeAlias, AsyncGenerator
 from uuid import uuid4
 
-from . import ToolExecutionContext, ToolExecutionHandler
+from .tool_execution import ToolExecutionContext, ToolExecutionHandler
 from .middleware import MiddlewareHandler, Middleware, MiddlewareStack
 from .stream_iteration import StreamIterationContext, StreamContextBase, StreamIterationHandler
 from .message import Message, ToolUse, ToolMessage
