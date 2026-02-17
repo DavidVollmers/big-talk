@@ -39,11 +39,12 @@ class DictionaryProperty(Property):
 ToolParametersProperty: TypeAlias = Union[
     Property, EnumProperty, ArrayProperty, ObjectProperty, DictionaryProperty, dict[str, Any]]
 
-
-class ToolParameters(TypedDict):
-    type: Literal['object']
-    properties: dict[str, ToolParametersProperty]
-    required: Sequence[str]
+ToolParameters = TypedDict('ToolParameters', {
+    'type': Literal['object'],
+    'properties': dict[str, ToolParametersProperty],
+    'required': Sequence[str],
+    '$defs': dict[str, 'ToolParameters'],
+}, total=False)
 
 
 @dataclass
@@ -117,13 +118,38 @@ class Tool:
             if is_required:
                 required.append(param_name)
 
-        parameters = ToolParameters(
-            type='object',
-            properties=properties,
-            required=required
-        )
+        raw_parameters = {
+            'type': 'object',
+            'properties': properties,
+            'required': required
+        }
+
+        defs = cls._hoist_definitions(raw_parameters)
+        if defs:
+            raw_parameters['$defs'] = defs
+
+        parameters = ToolParameters(**raw_parameters)
 
         return cls(name=func.__name__, description=description, parameters=parameters, func=func, metadata=metadata)
+
+    @staticmethod
+    def _hoist_definitions(schema: dict[str, Any]) -> dict[str, Any]:
+        collected_defs = {}
+
+        def search_and_extract(node: Any):
+            if isinstance(node, dict):
+                if "$defs" in node:
+                    collected_defs.update(node.pop("$defs"))
+
+                for value in node.values():
+                    search_and_extract(value)
+
+            elif isinstance(node, list):
+                for item in node:
+                    search_and_extract(item)
+
+        search_and_extract(schema)
+        return collected_defs
 
     @staticmethod
     def _schema_from_type(t: type) -> ToolParametersProperty:
@@ -194,6 +220,10 @@ class Tool:
             required = []
             for key in required_keys:
                 val_type = hints[key]
+
+                while get_origin(val_type) is Annotated:
+                    val_type = get_args(val_type)[0]
+
                 origin = get_origin(val_type)
                 args = get_args(val_type)
 

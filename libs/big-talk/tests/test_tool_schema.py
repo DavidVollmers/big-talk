@@ -192,3 +192,90 @@ def test_modern_union_syntax():
 
     # 2. Union[int, str] -> integer (Our logic picks the first one)
     assert props["id_val"]["type"] == "integer"
+
+
+def test_pydantic_nested_definitions_hoisting():
+    """
+    Verify that nested Pydantic models have their $defs extracted
+    and moved to the root of the tool schema.
+    """
+
+    class Address(BaseModel):
+        street: str
+        zip: str
+
+    class User(BaseModel):
+        name: str
+        address: Address  # Nested Pydantic model
+
+    def create_user(user: User):
+        pass
+
+    tool = Tool.from_func(create_user)
+
+    # 1. Check Root Structure
+    assert "$defs" in tool.parameters
+    assert "Address" in tool.parameters["$defs"]
+
+    # 2. Check Reference
+    user_props = tool.parameters["properties"]["user"]["properties"]
+    assert "$ref" in user_props["address"]
+    assert user_props["address"]["$ref"] == "#/$defs/Address"
+
+
+def test_pydantic_recursive_model():
+    """
+    Verify that recursive Pydantic models (referencing themselves)
+    generate valid schemas with hoisted definitions.
+    """
+
+    class Category(BaseModel):
+        name: str
+        # Recursive reference
+        subcategories: List["Category"] = Field(default_factory=list)
+
+    def organize(root: Category):
+        pass
+
+    tool = Tool.from_func(organize)
+
+    # 1. Definition exists
+    assert "$defs" in tool.parameters
+    assert "Category" in tool.parameters["$defs"]
+
+    # 2. Schema points to itself correctly
+    cat_def = tool.parameters["$defs"]["Category"]
+    sub_items = cat_def["properties"]["subcategories"]["items"]
+    assert sub_items["$ref"] == "#/$defs/Category"
+
+
+def test_boss_level_schema():
+    """
+    Combines: TypedDict + Annotated + Optional (Pipe Syntax) + Description Injection.
+    Ensures that the strictness logic works even when types are wrapped in Annotated.
+    """
+
+    class ComplexConfig(TypedDict):
+        # Should be REQUIRED (no None)
+        id: Annotated[int, "The ID"]
+
+        # Should be OPTIONAL (has None), description should persist
+        # Annotated wrapper shouldn't hide the UnionType from the nullable check
+        filter: Annotated[str | None, "Optional filter"]
+
+    def run_complex(cfg: ComplexConfig): pass
+
+    tool = Tool.from_func(run_complex)
+    props = tool.parameters["properties"]["cfg"]["properties"]
+    reqs = tool.parameters["properties"]["cfg"]["required"]
+
+    # 1. ID Check
+    assert "id" in reqs
+    assert props["id"]["type"] == "integer"
+    assert props["id"]["description"] == "The ID"
+
+    # 2. Filter Check
+    # Crucial: Unwrapped Annotated to find UnionType, so it's NOT required
+    assert "filter" not in reqs
+    assert props["filter"]["type"] == "string"
+    assert props["filter"]["description"] == "Optional filter"
