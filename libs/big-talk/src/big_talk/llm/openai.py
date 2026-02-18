@@ -32,6 +32,13 @@ class OpenAIProvider(LLMProvider):
     async def close(self):
         await self._client.close()
 
+    async def count_tokens(self, model: str, messages: Sequence[Message], tools: Sequence[Tool], **kwargs) -> int:
+        encoding = self._encoding_for_model(model)
+        converted_messages, _ = self._convert_messages(messages)
+        # TODO calculate tool tokens
+        # https://github.com/openai/openai-cookbook/blob/main/examples/How_to_count_tokens_with_tiktoken.ipynb
+        return self._count_message_tokens(converted_messages, model, encoding)
+
     async def stream(self, model: str, messages: Sequence[Message], tools: Sequence[Tool], **kwargs) \
             -> AsyncGenerator[AssistantMessage, None]:
         converted, last_user_message_id = self._convert_messages(messages)
@@ -210,13 +217,6 @@ class OpenAIProvider(LLMProvider):
                 ))
 
         return converted, last_user_message_id
-
-    async def count_tokens(self, model: str, messages: Sequence[Message], **kwargs) -> int:
-        encoding = self._encoding_for_model(model)
-        converted_messages, _ = self._convert_messages(messages)
-        # TODO tools once supported
-        # https://github.com/openai/openai-cookbook/blob/main/examples/How_to_count_tokens_with_tiktoken.ipynb
-        return self._count_message_tokens(converted_messages, model, encoding)
 
     @staticmethod
     def _count_message_tokens(messages: list[ChatCompletionMessageParam], model: str, encoding: 'Encoding') -> int:

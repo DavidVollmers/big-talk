@@ -7,7 +7,7 @@ from ..message import Message, AssistantMessage
 
 class LLMProvider(ABC):
     @abstractmethod
-    async def count_tokens(self, model: str, messages: Sequence[Message], **kwargs) -> int:
+    async def count_tokens(self, model: str, messages: Sequence[Message], tools: Sequence[Tool], **kwargs) -> int:
         pass
 
     @abstractmethod

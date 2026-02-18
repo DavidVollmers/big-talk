@@ -24,22 +24,17 @@ class AnthropicProvider(LLMProvider):
     async def close(self):
         await self._client.close()
 
-    async def count_tokens(self, model: str, messages: Sequence[Message], **kwargs) -> int:
+    async def count_tokens(self, model: str, messages: Sequence[Message], tools: Sequence[Tool], **kwargs) -> int:
         system, converted, _ = self._convert_messages(messages)
-        result = await self._client.messages.count_tokens(model=model, system=system, messages=converted, **kwargs)
+        tool_params = self._convert_tools(tools)
+        result = await self._client.messages.count_tokens(model=model, system=system, messages=converted,
+                                                          tools=tool_params, **kwargs)
         return result.input_tokens
 
     async def stream(self, model: str, messages: Sequence[Message], tools: Sequence[Tool], **kwargs) \
             -> AsyncGenerator[AssistantMessage, None]:
         system, converted, last_user_message_id = self._convert_messages(messages)
-        # noinspection PyTypeChecker
-        tool_params = [
-            ToolParam(
-                name=tool.name,
-                description=tool.description,
-                input_schema=tool.parameters
-            ) for tool in tools
-        ]
+        tool_params = self._convert_tools(tools)
         tool_map = {tool.name: tool for tool in tools}
         async with self._client.messages.stream(model=model,
                                                 system=system,
@@ -75,6 +70,17 @@ class AnthropicProvider(LLMProvider):
                 blocks.append(block)
                 yield AssistantMessage(id=message_id, role='assistant', content=[block], parent_id=last_user_message_id,
                                        is_aggregate=False)
+
+    @staticmethod
+    def _convert_tools(tools: Sequence[Tool]) -> list[ToolParam]:
+        # noinspection PyTypeChecker
+        return [
+            ToolParam(
+                name=tool.name,
+                description=tool.description,
+                input_schema=tool.parameters
+            ) for tool in tools
+        ]
 
     @staticmethod
     def _convert_messages(messages: Sequence[Message]) -> tuple[str | Omit, list[MessageParam], str]:
