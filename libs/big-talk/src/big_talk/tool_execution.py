@@ -1,11 +1,14 @@
 import inspect
 import json
+import logging
 from dataclasses import dataclass
 from typing import Sequence, TypeAlias, Iterable, Awaitable, Any
 
 from .message import ToolUse, Message, ToolResult
 from .middleware import MiddlewareStack, MiddlewareHandler, Middleware
 from .tool import Tool
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -63,6 +66,7 @@ class BaseToolExecutionHandler(ToolExecutionHandler):
                 is_error=False
             )
         except Exception as e:
+            logger.exception(f'Error executing tool {tool.name} with params {tool_use["params"]}')
             return ToolResult(
                 type='tool_result',
                 tool_use_id=tool_use['id'],
