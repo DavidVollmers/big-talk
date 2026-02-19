@@ -39,21 +39,36 @@ class OpenAIProvider(LLMProvider):
         # https://github.com/openai/openai-cookbook/blob/main/examples/How_to_count_tokens_with_tiktoken.ipynb
         return self._count_message_tokens(converted_messages, model, encoding)
 
+    async def send(self, model: str, messages: Sequence[Message], tools: Sequence[Tool], **kwargs) -> AssistantMessage:
+        converted, last_user_message_id = self._convert_messages(messages)
+        tool_params, tool_map = self._convert_tools(tools)
+
+        response = await self._client.chat.completions.create(model=model, messages=converted, tools=tool_params,
+                                                              **kwargs)
+
+        blocks = []
+        for choice in response.choices:
+            msg = choice.message
+            if msg.content:
+                blocks.append(Text(type='text', text=msg.content))
+            if msg.tool_calls:
+                for tool_call in msg.tool_calls:
+                    blocks.append(ToolUse(
+                        type='tool_use',
+                        id=tool_call.id,
+                        name=tool_call.function.name,
+                        params=json.loads(tool_call.function.arguments),
+                        metadata=tool_map[
+                            tool_call.function.name].metadata if tool_call.function.name in tool_map else None
+                    ))
+
+        return AssistantMessage(id=str(uuid4()), role='assistant', content=blocks, parent_id=last_user_message_id,
+                                is_aggregate=True)
+
     async def stream(self, model: str, messages: Sequence[Message], tools: Sequence[Tool], **kwargs) \
             -> AsyncGenerator[AssistantMessage, None]:
         converted, last_user_message_id = self._convert_messages(messages)
-        # noinspection PyTypeChecker
-        tool_params = [
-            ChatCompletionFunctionToolParam(
-                type='function',
-                function=FunctionDefinition(
-                    name=tool.name,
-                    description=tool.description,
-                    parameters=tool.parameters
-                )
-            ) for tool in tools
-        ]
-        tool_map = {tool.name: tool for tool in tools}
+        tool_params, tool_map = self._convert_tools(tools)
 
         text_buffer: list[str] = []
         current_tool_index: int | None = None
@@ -151,6 +166,22 @@ class OpenAIProvider(LLMProvider):
             parent_id=last_user_message_id,
             is_aggregate=True
         )
+
+    @staticmethod
+    def _convert_tools(tools: Sequence[Tool]) -> tuple[list[ChatCompletionFunctionToolParam], dict[str, Tool]]:
+        # noinspection PyTypeChecker
+        tool_params = [
+            ChatCompletionFunctionToolParam(
+                type='function',
+                function=FunctionDefinition(
+                    name=tool.name,
+                    description=tool.description,
+                    parameters=tool.parameters
+                )
+            ) for tool in tools
+        ]
+        tool_map = {tool.name: tool for tool in tools}
+        return tool_params, tool_map
 
     @staticmethod
     def _build_tool_use_block(tool_id: str, tool_name: str, arg_parts: list[str], tool_map: dict[str, Tool]) -> ToolUse:

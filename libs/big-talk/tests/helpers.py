@@ -1,7 +1,7 @@
 import asyncio
 from typing import AsyncGenerator, Sequence
 from big_talk.llm import LLMProvider
-from big_talk import Message, AssistantMessage, Text
+from big_talk import Message, AssistantMessage, Text, Tool
 from big_talk.stream_iteration import StreamIterationContext, StreamIterationHandler
 
 
@@ -10,6 +10,9 @@ class MockToolProvider(LLMProvider):
         self.responses = responses
 
     async def count_tokens(self, model: str, messages: Sequence[Message], **kwargs) -> int:
+        pass
+
+    async def send(self, model: str, messages: Sequence[Message], tools: Sequence[Tool], **kwargs) -> AssistantMessage:
         pass
 
     async def stream(self, model: str, messages: Sequence[Message], **kwargs) -> AsyncGenerator[AssistantMessage, None]:
@@ -29,6 +32,9 @@ class TestLLMProvider(LLMProvider):
 
     async def count_tokens(self, model: str, messages: Sequence[Message], **kwargs) -> int:
         return len(self.responses)
+
+    async def send(self, model: str, messages: Sequence[Message], tools: Sequence[Tool], **kwargs) -> AssistantMessage:
+        pass
 
     async def stream(self, model: str, messages: Sequence[Message], **kwargs) -> AsyncGenerator[AssistantMessage, None]:
         # Store calls for verification

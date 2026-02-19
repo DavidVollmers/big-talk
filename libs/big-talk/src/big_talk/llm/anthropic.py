@@ -3,11 +3,11 @@ from uuid import uuid4
 
 from anthropic import Omit, omit
 from anthropic.types import MessageParam, ToolResultBlockParam, ThinkingBlockParam, TextBlockParam, ToolUseBlockParam, \
-    ToolParam
+    ToolParam, ContentBlock
 
 from .llm_provider import LLMProvider
 from ..tool import Tool
-from ..message import Message, AssistantContentBlock, ToolUse, Text, AssistantMessage
+from ..message import Message, AssistantContentBlock, ToolUse, Text, AssistantMessage, Thinking
 
 
 class AnthropicProvider(LLMProvider):
@@ -31,6 +31,16 @@ class AnthropicProvider(LLMProvider):
                                                           tools=tool_params, **kwargs)
         return result.input_tokens
 
+    async def send(self, model: str, messages: Sequence[Message], tools: Sequence[Tool], **kwargs) -> AssistantMessage:
+        system, converted, last_user_message_id = self._convert_messages(messages)
+        tool_params = self._convert_tools(tools)
+        tool_map = {tool.name: tool for tool in tools}
+        response = await self._client.messages.create(model=model, system=system, messages=converted, tools=tool_params,
+                                                      **kwargs)
+        content = [AnthropicProvider._to_block(block, tool_map) for block in response.content]
+        return AssistantMessage(id=str(uuid4()), role='assistant', content=content, parent_id=last_user_message_id,
+                                is_aggregate=True)
+
     async def stream(self, model: str, messages: Sequence[Message], tools: Sequence[Tool], **kwargs) \
             -> AsyncGenerator[AssistantMessage, None]:
         system, converted, last_user_message_id = self._convert_messages(messages)
@@ -48,23 +58,13 @@ class AnthropicProvider(LLMProvider):
                     yield AssistantMessage(id=message_id, role='assistant', content=blocks,
                                            parent_id=last_user_message_id, is_aggregate=True)
                     blocks = []
+                    continue
 
                 if chunk.type != 'content_block_stop':
                     continue
 
-                if chunk.content_block.type == 'text':
-                    block = Text(type='text', text=chunk.content_block.text)
-                elif chunk.content_block.type == 'thinking':
-                    block = ThinkingBlockParam(type='thinking',
-                                               thinking=chunk.content_block.thinking,
-                                               signature=chunk.content_block.signature)
-                elif chunk.content_block.type == 'tool_use':
-                    metadata = tool_map[
-                        chunk.content_block.name].metadata if chunk.content_block.name in tool_map else None
-                    block = ToolUse(type='tool_use', id=chunk.content_block.id, name=chunk.content_block.name,
-                                    params=chunk.content_block.input, metadata=metadata)
-                else:
-                    # TODO redacted thinking
+                block = self._to_block(chunk.content_block, tool_map)
+                if not block:
                     continue
 
                 blocks.append(block)
@@ -109,14 +109,14 @@ class AnthropicProvider(LLMProvider):
             elif role == 'assistant':
                 converted.append(MessageParam(
                     role='assistant',
-                    content=[AnthropicProvider._convert_block(block) for block in content]
+                    content=[AnthropicProvider._from_block(block) for block in content]
                 ))
 
         system = '\n'.join(system_parts) if system_parts else omit
         return system, converted, last_user_message_id
 
     @staticmethod
-    def _convert_block(block: AssistantContentBlock) -> Union[TextBlockParam, ThinkingBlockParam, ToolUseBlockParam]:
+    def _from_block(block: AssistantContentBlock) -> Union[TextBlockParam, ThinkingBlockParam, ToolUseBlockParam]:
         match block:
             case {'type': 'text', 'text': text}:
                 return TextBlockParam(type='text', text=text)
@@ -126,3 +126,16 @@ class AnthropicProvider(LLMProvider):
                 return ToolUseBlockParam(type='tool_use', id=tool_use_id, name=name, input=params)
             case _:
                 raise ValueError(f'Unsupported content block: {block}')
+
+    @staticmethod
+    def _to_block(block: ContentBlock, tool_map: dict[str, Tool]) -> AssistantContentBlock | None:
+        if block.type == 'text':
+            return Text(type='text', text=block.text)
+        elif block.type == 'thinking':
+            return Thinking(type='thinking', thinking=block.thinking, signature=block.signature)
+        elif block.type == 'tool_use':
+            metadata = tool_map[block.name].metadata if block.name in tool_map else None
+            return ToolUse(type='tool_use', id=block.id, name=block.name, params=block.input, metadata=metadata)
+        else:
+            # TODO redacted thinking
+            return None

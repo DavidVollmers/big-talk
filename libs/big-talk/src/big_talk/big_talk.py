@@ -1,14 +1,17 @@
 import asyncio
-from typing import Sequence, Any, AsyncGenerator, Callable
+from typing import Sequence, Any, AsyncGenerator, Callable, Iterable
 from uuid import uuid4
 
+from .loop import extract_tool_uses, use_tools
 from .middleware import MiddlewareStack
 from .stream import StreamMiddlewareStack, BaseStreamHandler, StreamContext
 from .stream_iteration import StreamIterationMiddlewareStack, BaseStreamIterationHandler
 from .tool import Tool
 from .llm import LLMProvider, LLMProviderFactory
-from .message import Message, ToolUse
+from .message import Message, ToolUse, ToolMessage
 from .tool_execution import ToolExecutionMiddlewareStack, BaseToolExecutionHandler, ToolExecutionContext
+
+DEFAULT_MAX_ITERATIONS = 10
 
 
 class BigTalk:
@@ -62,11 +65,48 @@ class BigTalk:
         provider, model_name = self._parse_model(model)
         return self._get_provider(provider), model_name
 
+    async def send(self, model: str, messages: Sequence[Message], tools: Sequence[Callable | Tool] = None,
+                   max_iterations: int = DEFAULT_MAX_ITERATIONS, **kwargs: Any) -> Iterable[Message]:
+        if not any(message['role'] == 'user' for message in messages):
+            raise ValueError('At least one user message is required to generate a response.')
+
+        normalized_tools = self._normalize_tools(tools)
+
+        tool_execution_handler = self._tool_execution.build()
+
+        provider, model_name = self._get_llm_provider(model)
+
+        current_history = list(messages)
+        for iteration in range(max_iterations):
+            message = await provider.send(model_name, current_history, tools=normalized_tools, **kwargs)
+
+            current_history.append(message)
+
+            tool_uses_by_parent = extract_tool_uses(message)
+
+            if not tool_uses_by_parent:
+                break
+
+            results_by_parent = await use_tools(tool_uses_by_parent, current_history, normalized_tools, iteration,
+                                                tool_execution_handler)
+
+            for parent_id, results in results_by_parent.items():
+                tool_result_message = ToolMessage(
+                    id=str(uuid4()),
+                    role='tool',
+                    content=results,
+                    parent_id=parent_id,
+                )
+
+                current_history.append(tool_result_message)
+
+        return current_history[len(messages):]
+
     async def stream(self,
                      model: str,
                      messages: Sequence[Message],
                      tools: Sequence[Callable | Tool] = None,
-                     max_iterations: int = 10,
+                     max_iterations: int = DEFAULT_MAX_ITERATIONS,
                      **kwargs: Any) -> AsyncGenerator[Message, None]:
         if not any(message['role'] == 'user' for message in messages):
             raise ValueError('At least one user message is required to generate a response.')
@@ -75,7 +115,6 @@ class BigTalk:
 
         stream_iteration_handler = self._stream_iteration.build()
         tool_execution_handler = self._tool_execution.build()
-
         streaming_handler = self._streaming.build()
 
         ctx = StreamContext(

@@ -1,10 +1,9 @@
-import asyncio
-from collections import defaultdict
 from dataclasses import dataclass
 from typing import TypeAlias, AsyncGenerator
 from uuid import uuid4
 
-from .tool_execution import ToolExecutionContext, ToolExecutionHandler
+from .loop import extract_tool_uses, use_tools
+from .tool_execution import ToolExecutionHandler
 from .middleware import MiddlewareHandler, Middleware, MiddlewareStack
 from .stream_iteration import StreamIterationContext, StreamContextBase, StreamIterationHandler
 from .message import Message, ToolUse, ToolMessage
@@ -46,31 +45,14 @@ class BaseStreamHandler(StreamHandler):
                 if is_app_message:
                     continue
 
-                parent_id = message['id']
-
-                tool_uses = [b for b in message['content'] if b['type'] == 'tool_use']
-                for tool_use in tool_uses:
-                    tool_uses_by_parent.append((parent_id, tool_use))
+                tool_uses_by_parent.extend(extract_tool_uses(message))
 
             if not tool_uses_by_parent:
                 break
 
-            tool_uses = [tu for _, tu in tool_uses_by_parent]
-
-            tool_execution_ctx = ToolExecutionContext(
-                tool_uses=tool_uses,
-                tools=ctx.tools,
-                messages=current_history,
-                iteration=iteration
-            )
-
             # noinspection PyProtectedMember
-            tool_tasks = await ctx._tool_execution_handler(tool_execution_ctx)
-            tool_results = await asyncio.gather(*tool_tasks)
-
-            results_by_parent = defaultdict(list)
-            for (parent_id, _), result in zip(tool_uses_by_parent, tool_results):
-                results_by_parent[parent_id].append(result)
+            results_by_parent = await use_tools(tool_uses_by_parent, current_history, ctx.tools, iteration,
+                                                ctx._tool_execution_handler)
 
             for parent_id, results in results_by_parent.items():
                 tool_result_message = ToolMessage(
