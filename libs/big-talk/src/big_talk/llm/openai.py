@@ -8,6 +8,7 @@ from openai.types.chat import ChatCompletionMessageParam, ChatCompletionSystemMe
     ChatCompletionAssistantMessageParam, ChatCompletionFunctionToolParam
 from openai.types.chat.chat_completion_message_function_tool_call_param import Function
 
+from ..serialization import serialize_tool_result
 from ..tool import Tool
 from ..message import Message, AssistantContentBlock, Text, AssistantMessage, ToolUse
 from .llm_provider import LLMProvider
@@ -215,7 +216,7 @@ class OpenAIProvider(LLMProvider):
                     converted.append(ChatCompletionToolMessageParam(
                         role='tool',
                         tool_call_id=block['tool_use_id'],
-                        content=block['result'],
+                        content=serialize_tool_result(block['result']),
                     ))
 
             elif role == 'user':

@@ -16,7 +16,7 @@ async def test_manual_execution_success(bigtalk):
     # Execute manually
     result = await bigtalk.execute_tool(adder, {"a": 5, "b": 3})
 
-    assert result == "8"  # Results are always stringified
+    assert result == 8
 
 
 @pytest.mark.asyncio

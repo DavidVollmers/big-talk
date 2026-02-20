@@ -6,6 +6,7 @@ from anthropic.types import MessageParam, ToolResultBlockParam, ThinkingBlockPar
     ToolParam, ContentBlock
 
 from .llm_provider import LLMProvider
+from ..serialization import serialize_tool_result
 from ..tool import Tool
 from ..message import Message, AssistantContentBlock, ToolUse, Text, AssistantMessage, Thinking
 
@@ -97,7 +98,7 @@ class AnthropicProvider(LLMProvider):
                     role='user',
                     content=[ToolResultBlockParam(type='tool_result',
                                                   tool_use_id=block['tool_use_id'],
-                                                  content=block['result'],
+                                                  content=serialize_tool_result(block['result']),
                                                   is_error=block['is_error']) for block in content]
                 ))
             elif role == 'user':

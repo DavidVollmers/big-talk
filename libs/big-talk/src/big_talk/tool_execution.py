@@ -62,7 +62,7 @@ class BaseToolExecutionHandler(ToolExecutionHandler):
             return ToolResult(
                 type='tool_result',
                 tool_use_id=tool_use['id'],
-                result=BaseToolExecutionHandler._serialize_result(result),
+                result=result,
                 is_error=False
             )
         except Exception as e:
@@ -73,16 +73,3 @@ class BaseToolExecutionHandler(ToolExecutionHandler):
                 result=str(e),
                 is_error=True
             )
-
-    @staticmethod
-    def _serialize_result(result: Any) -> str:
-        if isinstance(result, str):
-            return result
-
-        if result is None:
-            return "null"
-
-        try:
-            return json.dumps(result, ensure_ascii=False)
-        except (TypeError, OverflowError):
-            return str(result)

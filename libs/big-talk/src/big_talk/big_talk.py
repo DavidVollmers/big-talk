@@ -131,7 +131,7 @@ class BigTalk:
             yield message
 
     async def execute_tool(self, tool: Callable | Tool, params: dict[str, Any],
-                           messages: Sequence[Message] = None, metadata: dict[str, Any] = None) -> str | None:
+                           messages: Sequence[Message] = None, metadata: dict[str, Any] = None) -> Any | None:
         normalized_tool = self._normalize_tools([tool])[0]
 
         tool_use = ToolUse(

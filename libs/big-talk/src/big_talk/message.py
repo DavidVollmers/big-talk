@@ -12,7 +12,7 @@ class ToolUse(TypedDict):
 class ToolResult(TypedDict):
     type: Literal['tool_result']
     tool_use_id: str
-    result: str
+    result: Any
     is_error: bool
 
 
