@@ -1,4 +1,4 @@
-from typing import TypedDict, Annotated, Literal, List
+from typing import TypedDict, Annotated, Literal, List, Union
 
 from pydantic import BaseModel, Field
 
@@ -190,8 +190,12 @@ def test_modern_union_syntax():
     assert props["filter_val"]["type"] == "string"
     assert "filter_val" not in tool.parameters["required"]
 
-    # 2. Union[int, str] -> integer (Our logic picks the first one)
-    assert props["id_val"]["type"] == "integer"
+    # 2. Union[int, str] -> anyOf with integer and string
+    assert "anyOf" in props["id_val"], "Union types should generate 'anyOf' in schema."
+    any_of = props["id_val"]["anyOf"]
+    types_in_any_of = {item["type"] for item in any_of}
+    assert "integer" in types_in_any_of, "Union should include 'integer' type."
+    assert "string" in types_in_any_of, "Union should include 'string' type."
 
 
 def test_pydantic_nested_definitions_hoisting():
@@ -333,3 +337,49 @@ def test_schema_sanitization_no_nulls():
     # "count" should be integer, 'description' missing
     assert props["count"]["type"] == "integer"
     assert "description" not in props["count"]
+
+
+def test_union_anyof_generation():
+    """
+    Verify that Union types with multiple distinct types generate an 'anyOf' schema.
+    Validates that Pydantic models evaluated directly in a Union inline their schemas.
+    """
+
+    class TextComponent(BaseModel):
+        type: Literal['text']
+        content: str
+
+    class ImageComponent(BaseModel):
+        type: Literal['image']
+        url: str
+
+    ComponentUnion = Union[TextComponent, ImageComponent]
+
+    def render_page(components: List[ComponentUnion]):
+        """Renders a page with multiple components."""
+        pass
+
+    tool = Tool.from_func(render_page)
+    schema = tool.parameters
+
+    # 1. Check the base property
+    props = schema["properties"]
+    assert props["components"]["type"] == "array"
+
+    # 2. Check that 'anyOf' exists in the array items
+    items = props["components"]["items"]
+    assert "anyOf" in items, "The 'items' schema should contain 'anyOf' for a Union type."
+
+    # 3. Check that both types are represented in the anyOf list
+    any_of_list = items["anyOf"]
+    assert len(any_of_list) == 2, f"Expected 2 items in anyOf, got {len(any_of_list)}"
+
+    # 4. Verify the inline schemas contain the unique properties of our models
+    # We use a set to ensure both unique fields ('content' and 'url') are found across the anyOf items
+    found_properties = set()
+    for item in any_of_list:
+        if "properties" in item:
+            found_properties.update(item["properties"].keys())
+
+    assert "content" in found_properties, "TextComponent schema was not properly inlined."
+    assert "url" in found_properties, "ImageComponent schema was not properly inlined."

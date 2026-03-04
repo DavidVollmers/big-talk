@@ -188,7 +188,9 @@ class Tool:
             if len(non_none_args) == 1:
                 schema = Tool._schema_from_type(non_none_args[0])
             else:
-                schema = Tool._schema_from_type(non_none_args[0])
+                schema = {
+                    'anyOf': [Tool._schema_from_type(a) for a in non_none_args]
+                }
             schema['description'] = description or schema.get('description', '')
 
         # Pydantic support
