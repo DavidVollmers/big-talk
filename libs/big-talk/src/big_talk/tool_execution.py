@@ -1,8 +1,7 @@
 import inspect
-import json
 import logging
 from dataclasses import dataclass
-from typing import Sequence, TypeAlias, Iterable, Awaitable, Any
+from typing import Sequence, TypeAlias, Iterable, Awaitable
 
 from .message import ToolUse, Message, ToolResult
 from .middleware import MiddlewareStack, MiddlewareHandler, Middleware
@@ -66,8 +65,8 @@ class BaseToolExecutionHandler(ToolExecutionHandler):
                 result=result,
                 is_error=False
             )
-        except SuspensionError as e:
-            logger.warning(f'Encountered Suspension Request during tool execution.')
+        except SuspensionError:
+            logger.warning('Encountered Suspension Request during tool execution.')
             raise
         except Exception as e:
             logger.exception(f'Error executing tool {tool.name} with params {tool_use["params"]}')

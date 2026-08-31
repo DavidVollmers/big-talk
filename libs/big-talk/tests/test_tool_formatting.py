@@ -1,4 +1,3 @@
-import pytest
 from big_talk.tool import tool
 
 

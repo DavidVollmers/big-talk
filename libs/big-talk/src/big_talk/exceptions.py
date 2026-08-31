@@ -19,7 +19,8 @@ class SuspensionError(Exception):
         raise SuspensionError({"checkpoint": state}, message="human approval required")
     """
 
-    def __init__(self, details: object = None, children: dict[str, list['SuspensionError']] = None, message: str = None):
+    def __init__(self, details: object = None, children: dict[str, list['SuspensionError']] = None,
+                 message: str = None):
         self.details = details
         self.children = children
         super().__init__(message)
@@ -29,14 +30,16 @@ class SuspensionError(Exception):
             return super().__str__()
         return f"LoopSuspensionError: The Agent Loop was Suspended with the following details: {self.details}"
 
+
 class BatchSuspendedException(Exception):
     """
     Raised when a batch of tools is interrupted by a HITL suspension.
-    Carries both the tools that require approval and the tools that 
+    Carries both the tools that require approval and the tools that
     already successfully completed in the parallel batch.
     """
+
     def __init__(self, suspensions: dict[str, list[SuspensionError]], partial_results: dict[str, list[ToolResult]]):
         self.suspensions = suspensions
         self.partial_results = partial_results
-        super().__init__(f"Batch suspended: {len(suspensions)} pending approvals, {len(partial_results)} completed results.")
-        
+        super().__init__(
+            f"Batch suspended: {len(suspensions)} pending approvals, {len(partial_results)} completed results.")

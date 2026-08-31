@@ -70,7 +70,8 @@ async def test_hidden_dependency_injection(bigtalk, simple_message):
     # Execute
     history = []
     async for msg in bigtalk.stream("test/model", [simple_message], tools=[query_db]):
-        if msg['role'] == 'tool': history.append(msg)
+        if msg['role'] == 'tool':
+            history.append(msg)
 
     # Assert Result
     result = history[0]['content'][0]['result']

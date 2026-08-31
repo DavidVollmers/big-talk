@@ -2,7 +2,7 @@ from .big_talk import BigTalk
 from .message import Message, UserMessage, SystemMessage, AssistantMessage, ToolUse, ToolResult, Text, Thinking, \
     AssistantContentBlock, ToolMessage, AppMessage, InputMessage, OutputMessage, AssistantMessageDelta
 from .tool import Tool, tool, Property, EnumProperty, ArrayProperty, ObjectProperty, DictionaryProperty, \
-    ToolParametersProperty, Tool, tool
+    ToolParametersProperty
 from .stream import StreamContext, StreamMiddleware, StreamHandler
 from .exceptions import SuspensionError, BatchSuspendedException
 from .tool_execution import ToolExecutionContext, ToolExecutionMiddleware, ToolExecutionHandler

@@ -239,8 +239,8 @@ async def test_middleware_history_loading_deduplication(bigtalk, create_provider
     assert captured_message_lists[0][0]['id'] == "old_1"
 
     # Call 2 (Iteration 1): [Old1, Old2, UserInput, Start, ToolUse, ToolResult]
-    assert len(captured_message_lists[
-                   1]) == 6, f"Iteration 1 should have 6 messages, got {len(captured_message_lists[1])}. Duplication detected!"
+    assert len(captured_message_lists[1]) == 6, (
+        f"Iteration 1 should have 6 messages, got {len(captured_message_lists[1])}. Duplication detected!")
 
     # Verify the sequence is clean
     ids = [m['id'] for m in captured_message_lists[1]]

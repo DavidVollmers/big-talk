@@ -1,7 +1,7 @@
 import pytest
 from dotenv import load_dotenv
 
-from big_talk import BigTalk, Message, UserMessage
+from big_talk import BigTalk, UserMessage
 from tests.helpers import TestLLMProvider
 
 load_dotenv()

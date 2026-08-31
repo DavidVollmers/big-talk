@@ -111,7 +111,9 @@ async def test_global_close(bigtalk, create_provider, simple_message):
 def test_add_provider_duplicate_error():
     """Ensure adding a duplicate provider raises ValueError by default."""
     bt = BigTalk()
-    mock_factory = lambda: MagicMock()
+
+    def mock_factory():
+        return MagicMock()
 
     # 1. Add first time
     bt.add_provider("test_provider", mock_factory)

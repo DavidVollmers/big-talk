@@ -2,8 +2,8 @@ import inspect
 import logging
 from dataclasses import dataclass
 from types import UnionType
-from typing import Any, Callable, get_type_hints, get_origin, Literal, get_args, TypedDict, Sequence, Union, TypeAlias, \
-    Optional, is_typeddict, Annotated, overload, Iterable
+from typing import Any, Callable, get_type_hints, get_origin, Literal, get_args, TypedDict, Sequence, Union, \
+    TypeAlias, Optional, is_typeddict, Annotated, overload
 
 import docstring_parser
 

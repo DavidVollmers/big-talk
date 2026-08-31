@@ -445,4 +445,3 @@ async def test_suspension_details_preserved_in_batch_exception(bigtalk, simple_m
 
     suspension = exc_info.value.suspensions['parent_A'][0]
     assert suspension.details == checkpoint
-

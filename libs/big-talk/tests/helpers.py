@@ -36,7 +36,9 @@ class TestLLMProvider(LLMProvider):
     async def send(self, model: str, messages: Sequence[Message], tools: Sequence[Tool], **kwargs) -> AssistantMessage:
         pass
 
-    async def stream(self, model: str, messages: Sequence[Message], **kwargs) -> AsyncGenerator[AssistantMessage | AssistantMessageDelta, None]:
+    async def stream(
+        self, model: str, messages: Sequence[Message], **kwargs
+    ) -> AsyncGenerator[AssistantMessage | AssistantMessageDelta, None]:
         # Store calls for verification
         self.stream_calls.append({
             "model": model,

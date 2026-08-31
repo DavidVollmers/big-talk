@@ -3,7 +3,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from big_talk import UserMessage
 from big_talk.llm.openai import OpenAIProvider
-from big_talk.message import Message
 from big_talk.tool import Tool
 
 
