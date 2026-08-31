@@ -1,7 +1,10 @@
 import pytest
+from dotenv import load_dotenv
 
 from big_talk import BigTalk, Message, UserMessage
 from tests.helpers import TestLLMProvider
+
+load_dotenv()
 
 
 @pytest.fixture

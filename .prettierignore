@@ -9,3 +9,5 @@
 *.txt
 .nvmrc
 .flake8
+.env
+.env.*
