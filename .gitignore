@@ -1,6 +1,8 @@
 node_modules
 dist
 
+.idea
+
 
 .nx/cache
 .nx/workspace-data
