@@ -227,7 +227,6 @@ class OpenAIProvider(LLMProvider):
                 ))
 
             elif role == 'tool':
-                last_user_message_id = message['id']
                 for block in content:
                     converted.append(ChatCompletionToolMessageParam(
                         role='tool',
@@ -236,6 +235,7 @@ class OpenAIProvider(LLMProvider):
                     ))
 
             elif role == 'user':
+                last_user_message_id = message['id']
                 converted.append(ChatCompletionUserMessageParam(
                     role='user',
                     content=content
